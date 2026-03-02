@@ -1645,7 +1645,7 @@ impl AppModel {
                 )
                 .add(
                     widget::settings::item::builder(fl!("text-size"))
-                        .description(format!("{}", self.config.text_size))
+                        .description(format!("{}px", self.config.text_size))
                         .control(
                             widget::slider(6..=30, self.config.text_size as u16, |v| {
                                 Message::ConfigInput(ConfigInput::UpdateTextSize(v))
