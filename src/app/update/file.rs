@@ -1,0 +1,269 @@
+// SPDX-License-Identifier: GPL-3.0
+
+use crate::app::DiscardChangesAction;
+use crate::app::core::history::HistoryState;
+use crate::app::core::utils::{self, CedillaToast};
+use crate::app::{AppModel, Message, PaneContent, PreviewState, State};
+use crate::config::{BoolState, ShowState};
+use cosmic::widget::pane_grid;
+use cosmic::{Application, prelude::*};
+use frostmark::MarkState;
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
+use std::sync::Arc;
+use widgets::text_editor;
+
+impl AppModel {
+    pub fn handle_startup(&mut self) -> Task<cosmic::Action<Message>> {
+        let (mut panes, first_pane) = pane_grid::State::new(PaneContent::Editor);
+        panes.split(pane_grid::Axis::Vertical, first_pane, PaneContent::Preview);
+
+        let preview_state = match self.config.last_preview_showstate {
+            ShowState::Show => PreviewState::Shown,
+            ShowState::Hide => PreviewState::Hidden,
+        };
+
+        let path = match self.config.open_last_file {
+            BoolState::Yes => self.config.last_open_file.clone(),
+            BoolState::No => None,
+        };
+
+        if let Some(p) = path
+            && p.exists()
+        {
+            self.selected_nav_path = p.parent().map(|p| p.to_path_buf());
+
+            return Task::perform(utils::files::load_file(p), |res| {
+                cosmic::action::app(Message::OpenFile(res))
+            })
+            .chain(Task::done(cosmic::action::app(Message::SetPreviewState(
+                preview_state,
+            ))));
+        }
+
+        self.state = State::Ready {
+            path: None,
+            editor_content: text_editor::Content::new(),
+            markstate: MarkState::with_html_and_markdown(""),
+            images: HashMap::new(),
+            svgs: HashMap::new(),
+            images_in_progress: HashSet::new(),
+            is_dirty: true,
+            panes,
+            preview_state,
+            history: HistoryState::default(),
+        };
+        Task::none()
+    }
+
+    pub fn handle_new_file(&mut self) -> Task<cosmic::Action<Message>> {
+        let (mut panes, first_pane) = pane_grid::State::new(PaneContent::Editor);
+        panes.split(pane_grid::Axis::Vertical, first_pane, PaneContent::Preview);
+
+        self.state = State::Ready {
+            path: None,
+            editor_content: text_editor::Content::new(),
+            markstate: MarkState::with_html_and_markdown(""),
+            images: HashMap::new(),
+            svgs: HashMap::new(),
+            images_in_progress: HashSet::new(),
+            is_dirty: true,
+            panes,
+            preview_state: PreviewState::Shown,
+            history: HistoryState::default(),
+        };
+        Task::none()
+    }
+
+    pub fn handle_new_vault_file(&mut self, file_name: String) -> Task<cosmic::Action<Message>> {
+        let dir = self.selected_directory();
+
+        let file_path = {
+            let base = dir.join(format!("{}.md", file_name));
+            if !base.exists() {
+                base
+            } else {
+                let mut i = 1;
+                loop {
+                    let candidate = dir.join(format!("{}-{}.md", file_name, i));
+                    if !candidate.exists() {
+                        break candidate;
+                    }
+                    i += 1;
+                }
+            }
+        };
+
+        if let Err(e) = std::fs::write(&file_path, "") {
+            return self.update(Message::AddToast(CedillaToast::new(e)));
+        }
+
+        self.insert_file_node(&file_path, &dir);
+
+        let (mut panes, first_pane) = pane_grid::State::new(PaneContent::Editor);
+        panes.split(pane_grid::Axis::Vertical, first_pane, PaneContent::Preview);
+
+        self.state = State::Ready {
+            path: Some(file_path),
+            editor_content: text_editor::Content::new(),
+            markstate: MarkState::with_html_and_markdown(""),
+            images: HashMap::new(),
+            svgs: HashMap::new(),
+            images_in_progress: HashSet::new(),
+            is_dirty: true,
+            panes,
+            preview_state: PreviewState::Shown,
+            history: HistoryState::default(),
+        };
+
+        Task::none()
+    }
+
+    pub fn handle_new_vault_folder(
+        &mut self,
+        folder_name: String,
+    ) -> Task<cosmic::Action<Message>> {
+        let dir = self.selected_directory();
+
+        let folder_path = {
+            let base = dir.join(&folder_name);
+            if !base.exists() {
+                base
+            } else {
+                let mut i = 1;
+                loop {
+                    let candidate = dir.join(format!("{}-{}", folder_name, i));
+                    if !candidate.exists() {
+                        break candidate;
+                    }
+                    i += 1;
+                }
+            }
+        };
+
+        if let Err(e) = std::fs::create_dir(&folder_path) {
+            return self.update(Message::AddToast(CedillaToast::new(e)));
+        }
+
+        self.insert_folder_node(&folder_path, &dir);
+
+        Task::none()
+    }
+
+    pub fn handle_save_file(&mut self) -> Task<cosmic::Action<Message>> {
+        let State::Ready {
+            editor_content,
+            path,
+            is_dirty,
+            ..
+        } = &mut self.state
+        else {
+            return Task::none();
+        };
+
+        if !*is_dirty {
+            return Task::none();
+        }
+
+        let content = editor_content.text();
+        let path = path.clone();
+        let vault_path = self.config.vault_path.clone();
+
+        Task::perform(
+            async move {
+                match path {
+                    Some(path) => Some(utils::files::save_file(path, content).await),
+                    None => match utils::files::open_markdown_file_saver(vault_path).await {
+                        Some(path) => Some(utils::files::save_file(path.into(), content).await),
+                        None => None,
+                    },
+                }
+            },
+            |res| match res {
+                Some(result) => cosmic::action::app(Message::FileSaved(result)),
+                None => cosmic::action::none(),
+            },
+        )
+    }
+
+    pub fn handle_open_file(
+        &mut self,
+        result: Result<(PathBuf, Arc<String>), anywho::Error>,
+    ) -> Task<cosmic::Action<Message>> {
+        match result {
+            Ok((path, content)) => {
+                let vault_path = PathBuf::from(&self.config.vault_path);
+                if path.starts_with(&vault_path) {
+                    self.selected_nav_path = path.parent().map(|p| p.to_path_buf());
+                }
+
+                let (mut panes, first_pane) = pane_grid::State::new(PaneContent::Editor);
+                panes.split(pane_grid::Axis::Vertical, first_pane, PaneContent::Preview);
+
+                let markstate = MarkState::with_html_and_markdown(content.as_ref());
+                let images_in_progress = HashSet::new();
+
+                self.state = State::Ready {
+                    path: Some(path),
+                    editor_content: text_editor::Content::with_text(content.as_ref()),
+                    markstate,
+                    images: HashMap::new(),
+                    svgs: HashMap::new(),
+                    images_in_progress,
+                    is_dirty: false,
+                    panes,
+                    preview_state: PreviewState::Shown,
+                    history: HistoryState::new_with_content(content.to_string()),
+                };
+
+                if let State::Ready {
+                    markstate,
+                    images_in_progress,
+                    path,
+                    ..
+                } = &mut self.state
+                {
+                    return utils::images::download_images(markstate, images_in_progress, path);
+                }
+
+                Task::none()
+            }
+            Err(e) => self.update(Message::AddToast(CedillaToast::new(e))),
+        }
+    }
+
+    pub fn handle_file_saved(
+        &mut self,
+        result: Result<PathBuf, anywho::Error>,
+    ) -> Task<cosmic::Action<Message>> {
+        match result {
+            Ok(new_path) => {
+                let State::Ready { path, is_dirty, .. } = &mut self.state else {
+                    return Task::none();
+                };
+
+                *path = Some(new_path);
+                *is_dirty = false;
+
+                self.update(Message::AddToast(CedillaToast::new("File Saved!")))
+            }
+            Err(e) => self.update(Message::AddToast(CedillaToast::new(e))),
+        }
+    }
+
+    pub fn handle_discard_changes(
+        &mut self,
+        action: DiscardChangesAction,
+    ) -> Task<cosmic::Action<Message>> {
+        match action {
+            DiscardChangesAction::CloseApp => {
+                std::process::exit(0);
+            }
+            DiscardChangesAction::OpenFile(path) => {
+                Task::perform(utils::files::load_file(path), |res| {
+                    cosmic::action::app(Message::OpenFile(res))
+                })
+            }
+        }
+    }
+}
