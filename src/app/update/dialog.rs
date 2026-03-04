@@ -5,7 +5,6 @@ use crate::app::{AppModel, Message, NavMenuAction, State};
 use cosmic::widget::segmented_button;
 use cosmic::{Application, prelude::*};
 use slotmap::Key as SlotmapKey;
-use std::path::PathBuf;
 
 impl AppModel {
     pub fn handle_dialog_action(
@@ -41,7 +40,7 @@ impl AppModel {
                 dialogs::DialogAction::OpenRenameNodeDialog(entity),
             )),
             NavMenuAction::MoveNode(entity) => {
-                let vault_path = PathBuf::from(&self.config.vault_path);
+                let vault_path = self.config.vault_path();
                 self.dialog_state.available_folders = self.collect_all_folders(&vault_path, entity);
 
                 self.update(Message::DialogAction(

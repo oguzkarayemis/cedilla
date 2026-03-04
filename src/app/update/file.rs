@@ -197,7 +197,7 @@ impl AppModel {
         match result {
             Ok((path, content)) => {
                 // store parent directory of selected file in nav_path only if path is inside vault
-                let vault_path = PathBuf::from(&self.config.vault_path);
+                let vault_path = self.config.vault_path();
                 if path.starts_with(&vault_path) {
                     self.selected_nav_path = path.parent().map(|p| p.to_path_buf());
                 }

@@ -146,7 +146,7 @@ impl AppModel {
             self.move_nav_node(source_entity, target_entity, &dest);
         } else {
             // target folder was never opened, reload from disk
-            let vault_path = PathBuf::from(&self.config.vault_path);
+            let vault_path = self.config.vault_path();
             self.nav_model.clear();
             self.open_vault_folder(&vault_path);
         }
@@ -208,8 +208,7 @@ impl AppModel {
                 self.nav_model.clear();
 
                 // load vault
-                let vault_path = PathBuf::from(&self.config.vault_path);
-                self.open_vault_folder(&vault_path);
+                self.open_vault_folder(self.config.vault_path());
 
                 Task::done(cosmic::action::app(Message::NewFile))
             }
