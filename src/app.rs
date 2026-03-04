@@ -412,7 +412,7 @@ impl cosmic::Application for AppModel {
         // no need to use this for now as we don't have different context menu options for files and folders
         //let node = self.nav_model.data::<ProjectNode>(entity)?;
 
-        let mut items = Vec::with_capacity(1);
+        let mut items = Vec::with_capacity(3);
 
         items.push(cosmic::widget::menu::Item::Button(
             fl!("delete"),
