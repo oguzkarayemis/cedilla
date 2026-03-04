@@ -101,9 +101,7 @@ impl AppModel {
 
         if *is_dirty {
             // if it's a vault path with any modification or if it's a new file with any content
-            if (path.is_some() && history.history_index != 0)
-                || (path.is_none() && !editor_content.text().trim().is_empty())
-            {
+            if crate::app::needs_confirmation(path, history, editor_content) {
                 println!("TODO: We're here but for some reason it doesn't work");
                 //self.update(Message::DialogAction(
                 //    dialogs::DialogAction::OpenConfirmCloseFileDialog(

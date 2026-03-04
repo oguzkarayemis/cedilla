@@ -80,7 +80,7 @@ enum State {
         /// Current if/any file path
         path: Option<PathBuf>,
         /// Text Editor Content
-        editor_content: text_editor::Content,
+        editor_content: widgets::text_editor::Content,
         /// Markdown Preview state
         markstate: MarkState,
         /// Images in the Markdown preview
@@ -501,9 +501,7 @@ impl cosmic::Application for AppModel {
                         //self.selected_nav_path = path.parent().map(|p| p.to_path_buf());
 
                         if *is_dirty {
-                            if (old_path.is_some() && history.history_index != 0)
-                                || (old_path.is_none() && !editor_content.text().trim().is_empty())
-                            {
+                            if needs_confirmation(old_path, history, editor_content) {
                                 Task::done(cosmic::action::app(Message::DialogAction(
                                     dialogs::DialogAction::OpenConfirmCloseFileDialog(
                                         DiscardChangesAction::OpenFile(path),
@@ -1068,14 +1066,27 @@ fn cedilla_main_view<'a>(
         .into()
 }
 
+/// Returns true if it's a vault path with any modification or if it's a new file with any content
+fn needs_confirmation(
+    path: &Option<PathBuf>,
+    history: &HistoryState,
+    editor_content: &widgets::text_editor::Content,
+) -> bool {
+    (path.is_some() && history.history_index != 0)
+        || (path.is_none() && !editor_content.text().trim().is_empty())
+}
+
+/// Returns the text editor scrollable Id
 fn editor_scrollable_id() -> widget::Id {
     widget::Id::new("editor_scroll")
 }
 
+/// Returns the cotnent preview scrollable Id
 fn preview_scrollable_id() -> widget::Id {
     widget::Id::new("preview_scroll")
 }
 
+/// Creates the default panes for the app
 fn create_default_panes() -> pane_grid::State<PaneContent> {
     let (mut panes, first_pane) = pane_grid::State::new(PaneContent::Editor);
     panes.split(pane_grid::Axis::Vertical, first_pane, PaneContent::Preview);
