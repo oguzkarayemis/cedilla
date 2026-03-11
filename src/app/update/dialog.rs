@@ -69,6 +69,48 @@ impl AppModel {
                     Task::none()
                 }
             }
+            NavMenuAction::OpenFolderCreationDialog(entity) => {
+                if let Some(entity) = self
+                    .nav_model
+                    .data::<crate::app::core::project::ProjectNode>(entity)
+                {
+                    let path = match entity {
+                        crate::app::core::project::ProjectNode::Folder { path, .. } => path,
+                        crate::app::core::project::ProjectNode::File { path, .. } => {
+                            // a file should always have a parent
+                            path.parent().unwrap()
+                        }
+                    };
+
+                    // we update the selected nav path becasue the context menu click does not update it so
+                    // if the user hasn't left clicked first it has not updated
+                    self.selected_nav_path = Some(path.to_path_buf());
+                    self.handle_dialog_action(dialogs::DialogAction::OpenNewVaultFolderDialog)
+                } else {
+                    Task::none()
+                }
+            }
+            NavMenuAction::OpenVaultFileCreationDialog(entity) => {
+                if let Some(entity) = self
+                    .nav_model
+                    .data::<crate::app::core::project::ProjectNode>(entity)
+                {
+                    let path = match entity {
+                        crate::app::core::project::ProjectNode::Folder { path, .. } => path,
+                        crate::app::core::project::ProjectNode::File { path, .. } => {
+                            // a file should always have a parent
+                            path.parent().unwrap()
+                        }
+                    };
+
+                    // we update the selected nav path becasue the context menu click does not update it so
+                    // if the user hasn't left clicked first it has not updated
+                    self.selected_nav_path = Some(path.to_path_buf());
+                    self.handle_dialog_action(dialogs::DialogAction::OpenNewVaultFileDialog)
+                } else {
+                    Task::none()
+                }
+            }
         }
     }
 }

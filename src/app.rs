@@ -208,6 +208,8 @@ pub enum NavMenuAction {
     RenameNode(segmented_button::Entity),
     MoveNode(segmented_button::Entity),
     OpenNodeFileManager(segmented_button::Entity),
+    OpenFolderCreationDialog(segmented_button::Entity),
+    OpenVaultFileCreationDialog(segmented_button::Entity),
 }
 
 impl cosmic::widget::menu::Action for NavMenuAction {
@@ -411,6 +413,10 @@ impl cosmic::Application for AppModel {
             return Some(vec![]);
         }
 
+        // All of the weird code with the ButtonDisabled stuff is because there seems to be many issues
+        // with menu_inner crashing the app if there are more items in some context menus so all menus
+        // must have the same number of items
+
         // only one entry for root node
         if self.nav_model.indent(entity).unwrap_or(0) == 0 {
             return Some(cosmic::widget::menu::items(
@@ -436,6 +442,16 @@ impl cosmic::Application for AppModel {
                         None,
                         NavMenuAction::OpenNodeFileManager(entity),
                     ),
+                    cosmic::widget::menu::Item::Button(
+                        fl!("new-folder"),
+                        None,
+                        NavMenuAction::OpenFolderCreationDialog(entity),
+                    ),
+                    cosmic::widget::menu::Item::Button(
+                        fl!("new-vault-file"),
+                        None,
+                        NavMenuAction::OpenVaultFileCreationDialog(entity),
+                    ),
                 ],
             ));
         }
@@ -443,7 +459,7 @@ impl cosmic::Application for AppModel {
         // no need to use this for now as we don't have different context menu options for files and folders
         //let node = self.nav_model.data::<ProjectNode>(entity)?;
 
-        let mut items = Vec::with_capacity(4);
+        let mut items = Vec::with_capacity(6);
 
         items.push(cosmic::widget::menu::Item::Button(
             fl!("delete"),
@@ -464,6 +480,17 @@ impl cosmic::Application for AppModel {
             fl!("open-file-manager"),
             None,
             NavMenuAction::OpenNodeFileManager(entity),
+        ));
+        // If the entity is a file both creation dialogs will store the new folder/file in the parent folder
+        items.push(cosmic::widget::menu::Item::Button(
+            fl!("new-folder"),
+            None,
+            NavMenuAction::OpenFolderCreationDialog(entity),
+        ));
+        items.push(cosmic::widget::menu::Item::Button(
+            fl!("new-vault-file"),
+            None,
+            NavMenuAction::OpenVaultFileCreationDialog(entity),
         ));
 
         Some(cosmic::widget::menu::items(
