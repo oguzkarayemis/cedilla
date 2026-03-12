@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 
 use crate::app::core::utils::{self, CedillaToast};
-use crate::app::{AppModel, Message, PreviewState, State};
+use crate::app::{AppModel, DiscardChangesAction, Message, PreviewState, State, dialogs};
 use crate::config::ShowState;
-use cosmic::iced::window;
 use cosmic::prelude::*;
 use std::process;
 
@@ -44,10 +43,7 @@ impl AppModel {
         }
     }
 
-    pub fn handle_app_close_requested(
-        &mut self,
-        window_id: window::Id,
-    ) -> Task<cosmic::Action<Message>> {
+    pub fn handle_app_close_requested(&mut self) -> Task<cosmic::Action<Message>> {
         let State::Ready {
             editor,
             preview_state,
@@ -56,10 +52,6 @@ impl AppModel {
         else {
             return Task::none();
         };
-
-        if Some(window_id) != self.core.main_window_id() {
-            return Task::none();
-        }
 
         if let Some(handler) = &self.config_handler {
             let current_preview_state = match preview_state {
@@ -94,13 +86,9 @@ impl AppModel {
         if editor.is_dirty {
             // if it's a vault path with any modification or if it's a new file with any content
             if editor.needs_confirmation() {
-                println!("TODO: We're here but for some reason it doesn't work");
-                //self.handle_dialog_action(
-                //    dialogs::DialogAction::OpenConfirmCloseFileDialog(
-                //        DiscardChangesAction::CloseApp,
-                //    ),
-                //)
-                process::exit(0);
+                self.handle_dialog_action(dialogs::DialogAction::OpenConfirmCloseFileDialog(
+                    DiscardChangesAction::CloseApp,
+                ))
             } else {
                 process::exit(0);
             }

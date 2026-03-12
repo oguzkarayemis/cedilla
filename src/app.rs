@@ -11,7 +11,7 @@ use crate::config::{AppTheme, BoolState, CedillaConfig, ConfigInput, ShowState};
 use crate::key_binds::key_binds;
 use crate::{fl, icons};
 use cosmic::app::context_drawer;
-use cosmic::iced::{Alignment, Event, Font, Length, Padding, Subscription, highlighter, window};
+use cosmic::iced::{Alignment, Event, Font, Length, Padding, Subscription, highlighter};
 use cosmic::iced_core::keyboard::{Key, Modifiers};
 use cosmic::iced_widget::{center, column, row, scrollable, tooltip};
 use cosmic::widget::space::horizontal;
@@ -198,7 +198,7 @@ pub enum Message {
     /// Export current document to PDF
     ExportPDF,
     /// Callback after using asks to close the app
-    AppCloseRequested(window::Id),
+    AppCloseRequested,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -642,8 +642,8 @@ impl cosmic::Application for AppModel {
         Subscription::batch(subscriptions)
     }
 
-    fn on_close_requested(&self, id: window::Id) -> Option<Message> {
-        Some(Message::AppCloseRequested(id))
+    fn on_app_exit(&mut self) -> Option<Self::Message> {
+        Some(Message::AppCloseRequested)
     }
 
     /// Handles messages emitted by the application and its widgets.
@@ -706,7 +706,7 @@ impl cosmic::Application for AppModel {
 
             // Others
             Message::ExportPDF => self.handle_export_pdf(),
-            Message::AppCloseRequested(id) => self.handle_app_close_requested(id),
+            Message::AppCloseRequested => self.handle_app_close_requested(),
         }
     }
 }
