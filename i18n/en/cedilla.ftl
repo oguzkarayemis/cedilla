@@ -51,6 +51,8 @@ gotenberg-url = Set the Gotenberg server URL
 apply = Apply
 more-info = More Info
 text-size = Text Size
+vault-default-location = Default (App Data Directory)
+flatpak-permissions = By default, the Flatpak version only has permissions for the Documents, Downloads, and Pictures folders. Moving the vault to any other location will make the app stop working correctly. If you want to use other directories, please tweak the permissions with tools like Flatseal.
 
 <#-- Application MenuBar -->
 file = File

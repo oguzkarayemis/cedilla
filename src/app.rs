@@ -739,6 +739,19 @@ impl AppModel {
             .iter()
             .position(|t| *t == self.config.dark_highlighter_theme.0);
 
+        let location_label = if let (Ok(vault), Ok(data_dir)) = (
+            self.config.vault_path().canonicalize(),
+            dirs::data_dir().unwrap().canonicalize(),
+        ) {
+            if vault.starts_with(data_dir) {
+                fl!("vault-default-location")
+            } else {
+                self.config.vault_path.to_string()
+            }
+        } else {
+            self.config.vault_path.to_string()
+        };
+
         widget::settings::view_column(vec![
             widget::settings::section()
                 .title(fl!("appearance"))
@@ -767,15 +780,29 @@ impl AppModel {
             widget::settings::section()
                 .title(fl!("general"))
                 .add(
-                    widget::settings::item::builder(fl!("move-vault"))
-                        .description(fl!(
-                            "current-location",
-                            location = self.config.vault_path.to_string()
-                        ))
-                        .control(
+                    cosmic::widget::column::with_children(vec![
+                        row![
+                            text::body(fl!("move-vault")),
+                            horizontal(),
+                            widget::tooltip(
+                                widget::icon(icons::get_handle("dialog-information-symbolic", 18)),
+                                container(text(fl!("flatpak-permissions")))
+                                    .padding(6.)
+                                    .max_width(250.),
+                                tooltip::Position::Left
+                            ),
+                        ]
+                        .align_y(Alignment::Center)
+                        .into(),
+                        text::caption(fl!("current-location", location = location_label)).into(),
+                        row![
+                            horizontal(),
                             widget::button::destructive(fl!("move-vault"))
                                 .on_press(Message::MoveVault),
-                        ),
+                        ]
+                        .into(),
+                    ])
+                    .spacing(cosmic::theme::spacing().space_xxs),
                 )
                 .add(
                     widget::settings::item::builder(fl!("last-file")).control(widget::dropdown(
