@@ -330,3 +330,76 @@ fn format_numbered_list(text: &str) -> String {
         .collect::<Vec<_>>()
         .join("\n")
 }
+
+pub fn is_list_line(line: &str) -> bool {
+    let trimmed = line.trim_start_matches(' ');
+    strip_numbered_prefix(trimmed).is_some()
+        || trimmed.starts_with("- ")
+        || trimmed.starts_with("* ")
+        || trimmed.starts_with("+ ")
+        || trimmed.starts_with("- [ ] ")
+        || trimmed.starts_with("- [x] ")
+}
+
+/// If the current line is a list item, returns the prefix to continue with on the next line.
+/// Returns Some("") if the line is an empty list item (break  out of the list).
+/// Returns None if not a list line.
+pub fn get_list_continuation(content: &text_editor::Content) -> Option<String> {
+    let cursor_line = content.cursor().position.line;
+    let line = content.line(cursor_line)?.text;
+
+    let indent = leading_indent(&line);
+    let trimmed = &line[indent.len()..];
+
+    // Numbered list
+    if let Some(rest) = strip_numbered_prefix(trimmed) {
+        if rest.trim().is_empty() {
+            return Some(String::new()); // empty item, break out
+        }
+        // find current number and increment
+        let num = current_list_number(trimmed)?;
+        return Some(format!("{}. ", num + 1));
+    }
+
+    // Checkbox list (before bullet check since it also starts with "- ")
+    for prefix in &["- [ ] ", "- [x] "] {
+        if let Some(rest) = trimmed.strip_prefix(prefix) {
+            if rest.trim().is_empty() {
+                return Some(String::new());
+            }
+            return Some("- [ ] ".to_string()); // insert unchecked
+        }
+    }
+
+    // Bullet list
+    for prefix in &["- ", "* ", "+ "] {
+        if let Some(rest) = trimmed.strip_prefix(prefix) {
+            if rest.trim().is_empty() {
+                return Some(String::new());
+            }
+            return Some(prefix.to_string());
+        }
+    }
+
+    None
+}
+
+fn leading_indent(line: &str) -> &str {
+    let trimmed = line.trim_start_matches(' ');
+    &line[..line.len() - trimmed.len()]
+}
+
+fn strip_numbered_prefix(line: &str) -> Option<&str> {
+    let dot_pos = line.find(". ")?;
+    let num_part = &line[..dot_pos];
+    if num_part.chars().all(|c| c.is_ascii_digit()) && !num_part.is_empty() {
+        Some(&line[dot_pos + 2..])
+    } else {
+        None
+    }
+}
+
+fn current_list_number(line: &str) -> Option<usize> {
+    let dot_pos = line.find(". ")?;
+    line[..dot_pos].parse().ok()
+}

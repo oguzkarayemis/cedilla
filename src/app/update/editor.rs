@@ -16,7 +16,15 @@ impl AppModel {
         };
 
         let was_edit = action.is_edit();
-        editor.content.perform(action);
+
+        if let text_editor::Action::Edit(text_editor::Edit::Enter) = &action {
+            editor.handle_list_continuation();
+        } else if let text_editor::Action::Edit(text_editor::Edit::Insert('\t')) = &action {
+            editor.handle_list_indent();
+        } else {
+            editor.content.perform(action);
+        }
+
         preview.update_content(editor.content.text().as_ref());
 
         if was_edit {

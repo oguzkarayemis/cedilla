@@ -88,4 +88,53 @@ impl EditorState {
         (self.path.is_some() && self.history.history_index != 0)
             || (self.path.is_none() && !self.content.text().trim().is_empty())
     }
+
+    pub fn handle_list_continuation(&mut self) {
+        match crate::app::utils::markdown::get_list_continuation(&self.content) {
+            Some(continuation) if continuation.is_empty() => {
+                // empty list item, clear the prefix and break out
+                self.content
+                    .perform(text_editor::Action::Move(text_editor::Motion::Home));
+                self.content
+                    .perform(text_editor::Action::Select(text_editor::Motion::End));
+                self.content
+                    .perform(text_editor::Action::Edit(text_editor::Edit::Delete));
+            }
+            Some(continuation) => {
+                self.content
+                    .perform(text_editor::Action::Edit(text_editor::Edit::Enter));
+                self.content
+                    .perform(text_editor::Action::Edit(text_editor::Edit::Paste(
+                        std::sync::Arc::new(continuation),
+                    )));
+            }
+            None => {
+                self.content
+                    .perform(text_editor::Action::Edit(text_editor::Edit::Enter));
+            }
+        }
+    }
+
+    pub fn handle_list_indent(&mut self) {
+        let cursor_line = self.content.cursor().position.line;
+        let line = self
+            .content
+            .line(cursor_line)
+            .map(|l| l.text)
+            .unwrap_or_default();
+
+        if crate::app::utils::markdown::is_list_line(&line) {
+            self.content
+                .perform(text_editor::Action::Move(text_editor::Motion::Home));
+            self.content
+                .perform(text_editor::Action::Edit(text_editor::Edit::Paste(
+                    std::sync::Arc::new("  ".to_string()),
+                )));
+            self.content
+                .perform(text_editor::Action::Move(text_editor::Motion::End));
+        } else {
+            self.content
+                .perform(text_editor::Action::Edit(text_editor::Edit::Insert('\t')));
+        }
+    }
 }
