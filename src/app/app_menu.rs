@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 
 use crate::{app::Message, fl};
-use cosmic::widget::menu::{self, items, root, Item, KeyBind, MenuBar, Tree};
-use cosmic::Element;
+use cosmic::widget::menu::{self, ItemHeight, ItemWidth, KeyBind};
+use cosmic::{Apply, Element};
 use std::collections::HashMap;
 
 /// Represents a Action that executes after clicking on the application Menu
@@ -50,41 +50,44 @@ impl menu::action::MenuAction for MenuAction {
 }
 
 pub fn menu_bar<'a>(key_binds: &HashMap<KeyBind, MenuAction>) -> Element<'a, Message> {
-    MenuBar::new(vec![
-        Tree::with_children(
-            Element::from(root(fl!("file"))),
-            items(
+    menu::bar(vec![
+        menu::Tree::with_children(
+            menu::root(fl!("file")).apply(Element::from),
+            menu::items(
                 key_binds,
                 vec![
-                    Item::Button(fl!("new-vault-file"), None, MenuAction::NewVaultFile),
-                    Item::Button(fl!("new-folder"), None, MenuAction::NewVaultFolder),
-                    Item::Button(fl!("open-file"), None, MenuAction::OpenFile),
-                    Item::Button(fl!("save-file"), None, MenuAction::SaveFile),
-                    Item::Divider,
-                    Item::Button(fl!("new-file"), None, MenuAction::NewFile),
+                    menu::Item::Button(fl!("new-vault-file"), None, MenuAction::NewVaultFile),
+                    menu::Item::Button(fl!("new-folder"), None, MenuAction::NewVaultFolder),
+                    menu::Item::Button(fl!("open-file"), None, MenuAction::OpenFile),
+                    menu::Item::Button(fl!("save-file"), None, MenuAction::SaveFile),
+                    menu::Item::Divider,
+                    menu::Item::Button(fl!("new-file"), None, MenuAction::NewFile),
                 ],
             ),
         ),
-        Tree::with_children(
-            Element::from(root(fl!("edit"))),
-            items(
+        menu::Tree::with_children(
+            menu::root(fl!("edit")).apply(Element::from),
+            menu::items(
                 key_binds,
                 vec![
-                    Item::Button(fl!("undo"), None, MenuAction::Undo),
-                    Item::Button(fl!("redo"), None, MenuAction::Redo),
+                    menu::Item::Button(fl!("undo"), None, MenuAction::Undo),
+                    menu::Item::Button(fl!("redo"), None, MenuAction::Redo),
                 ],
             ),
         ),
-        Tree::with_children(
-            Element::from(root(fl!("view"))),
-            items(
+        menu::Tree::with_children(
+            menu::root(fl!("view")).apply(Element::from),
+            menu::items(
                 key_binds,
                 vec![
-                    Item::Button(fl!("about"), None, MenuAction::About),
-                    Item::Button(fl!("settings"), None, MenuAction::Settings),
+                    menu::Item::Button(fl!("about"), None, MenuAction::About),
+                    menu::Item::Button(fl!("settings"), None, MenuAction::Settings),
                 ],
             ),
         ),
     ])
+    .item_height(ItemHeight::Dynamic(40))
+    .item_width(ItemWidth::Uniform(270))
+    .spacing(4.0)
     .into()
 }
