@@ -14,6 +14,7 @@ const APP_ID: &str = "dev.mariinkys.Cedilla";
 const CONFIG_VERSION: u64 = 1;
 
 #[derive(Debug, Clone, CosmicConfigEntry, Eq, PartialEq)]
+#[version = 1]
 pub struct CedillaConfig {
     pub app_theme: AppTheme,
     pub vault_path: String,
