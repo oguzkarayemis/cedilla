@@ -31,6 +31,7 @@ reqwest.workspace = true
 url.workspace = true
 dissimilar.workspace = true
 icu.workspace = true
+font-kit.workspace = true
 
 # PDF Generation Generation
 gotenberg_pdf.workspace = true
@@ -71,6 +72,7 @@ regex = "1.12.3"
 pulldown-cmark = "0.13.1"
 dissimilar = "1.0.10"
 gotenberg_pdf = { git = "https://github.com/mariinkys/gotenberg_pdf" }
+font-kit = "0.14.3"
 
 [workspace.dependencies.libcosmic]
 git = "https://github.com/pop-os/libcosmic.git"

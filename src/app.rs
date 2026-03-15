@@ -65,6 +65,10 @@ pub struct AppModel {
     config: CedillaConfig,
     // Application Themes
     app_themes: Vec<String>,
+    // Fonts available in the system
+    system_fonts: Vec<String>,
+    /// Editor and preview fonts
+    cedilla_font: Font,
     // Syntax Highlighting Themes
     highlighter_themes: Vec<String>,
     /// Currently selected path on the navbar (i need these for accurate file creadtion deletion...)
@@ -263,6 +267,21 @@ impl cosmic::Application for AppModel {
 
         let gotenberg_url = flags.config.gotenberg_url.clone();
 
+        let font = if let Some(ref name) = flags.config.selected_font_family {
+            let static_name: &'static str = Box::leak(name.clone().into_boxed_str());
+            Font {
+                family: cosmic::iced::font::Family::Name(static_name),
+                weight: cosmic::iced::font::Weight::Normal,
+                stretch: cosmic::iced::font::Stretch::Normal,
+                style: cosmic::iced::font::Style::Normal,
+            }
+        } else {
+            Font::DEFAULT
+        };
+
+        let mut font_options = vec![fl!("default-font")];
+        font_options.extend(flags.system_fonts.iter().cloned());
+
         // Construct the app model with the runtime's core.
         let mut app = AppModel {
             toasts: Toasts::new(Message::CloseToast),
@@ -278,6 +297,8 @@ impl cosmic::Application for AppModel {
             config_handler: flags.config_handler,
             config: flags.config,
             app_themes: vec![fl!("match-desktop"), fl!("dark"), fl!("light")],
+            system_fonts: font_options,
+            cedilla_font: font,
             highlighter_themes: highlighter::Theme::ALL
                 .iter()
                 .map(|t| t.to_string())
@@ -600,7 +621,14 @@ impl cosmic::Application for AppModel {
                 panes,
                 preview_state,
                 ..
-            } => cedilla_main_view(&self.config, editor, preview, panes, preview_state),
+            } => cedilla_main_view(
+                &self.config,
+                editor,
+                preview,
+                panes,
+                preview_state,
+                *&self.cedilla_font,
+            ),
         };
 
         toaster(&self.toasts, container(content).center(Length::Fill))
@@ -756,6 +784,14 @@ impl AppModel {
             self.config.vault_path.to_string()
         };
 
+        let font_selected = self
+            .config
+            .selected_font_family
+            .as_ref()
+            .and_then(|name| self.system_fonts.iter().position(|f| f == name))
+            .map(|i| i + 1) // offset by 1 because "Default" is at index 0
+            .unwrap_or(0);
+
         widget::settings::view_column(vec![
             widget::settings::section()
                 .title(fl!("appearance"))
@@ -777,6 +813,17 @@ impl AppModel {
                     widget::settings::item::builder(fl!("dark-highlighter")).control(
                         widget::dropdown(&self.highlighter_themes, dark_theme_selected, |index| {
                             Message::ConfigInput(ConfigInput::UpdateDarkHighlighterTheme(index))
+                        }),
+                    ),
+                )
+                .add(
+                    widget::settings::item::builder(fl!("selected-font")).control(
+                        widget::dropdown(&self.system_fonts, Some(font_selected), |index| {
+                            if index == 0 {
+                                Message::ConfigInput(ConfigInput::ResetFont)
+                            } else {
+                                Message::ConfigInput(ConfigInput::UpdateFont(index - 1))
+                            }
                         }),
                     ),
                 )
@@ -925,11 +972,12 @@ fn cedilla_main_view<'a>(
     preview: &'a MarkdownPreview,
     panes: &'a pane_grid::State<PaneContent>,
     preview_state: &'a PreviewState,
+    font: Font,
 ) -> Element<'a, Message> {
     let spacing = theme::active().cosmic().spacing;
 
-    let create_editor = || {
-        container(responsive(|size| {
+    let create_editor = move || {
+        container(responsive(move |size| {
             let highlighter_theme: highlighter::Theme = match app_config.app_theme {
                 AppTheme::Dark => app_config.dark_highlighter_theme.into(),
                 AppTheme::Light => app_config.light_highlighter_theme.into(),
@@ -957,6 +1005,7 @@ fn cedilla_main_view<'a>(
                         |highlight, _theme| highlight.to_format(),
                     )
                     .size(app_config.text_size)
+                    .font(font)
                     .padding(0)
                     .retain_focus_on_external_click(true)
                     .on_action(Message::Edit),
@@ -1021,6 +1070,7 @@ fn cedilla_main_view<'a>(
                         MarkWidget::new(&preview.markstate)
                             .on_updating_state(Message::UpdateMarkState)
                             .on_clicking_link(Message::LaunchUrl)
+                            .font(font)
                             .text_size(app_config.text_size)
                             .code_highlight_theme(highlighter_theme)
                             .on_drawing_image(|info| {

@@ -2,6 +2,7 @@
 
 use crate::app::{AppModel, Message};
 use crate::config::{AppTheme, CedillaConfig, CedillaHighlighterTheme, ConfigInput};
+use cosmic::iced::Font;
 use cosmic::prelude::*;
 
 impl AppModel {
@@ -138,6 +139,46 @@ impl AppModel {
                 } else {
                     Task::none()
                 }
+            }
+            ConfigInput::UpdateFont(index) => {
+                if let Some(name) = self.system_fonts.get(index).cloned() {
+                    // TODO: Is this the only way we can do this?
+                    let static_name: &'static str = Box::leak(name.clone().into_boxed_str());
+
+                    self.cedilla_font = Font {
+                        family: cosmic::iced::font::Family::Name(static_name),
+                        weight: cosmic::iced::font::Weight::Normal,
+                        stretch: cosmic::iced::font::Stretch::Normal,
+                        style: cosmic::iced::font::Style::Normal,
+                    };
+
+                    self.apply_config(move |config, handler| {
+                        if let Some(h) = handler {
+                            config
+                                .set_selected_font_family(h, Some(name))
+                                .map_err(|e| e.to_string())?;
+                        } else {
+                            config.selected_font_family = Some(name);
+                        }
+                        Ok(())
+                    })
+                } else {
+                    Task::none()
+                }
+            }
+            ConfigInput::ResetFont => {
+                self.cedilla_font = Font::DEFAULT;
+
+                self.apply_config(|config, handler| {
+                    if let Some(h) = handler {
+                        config
+                            .set_selected_font_family(h, None)
+                            .map_err(|e| e.to_string())?;
+                    } else {
+                        config.selected_font_family = None;
+                    }
+                    Ok(())
+                })
             }
         }
     }
