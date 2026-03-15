@@ -5,7 +5,12 @@ use cosmic::dialog::{ashpd::desktop::file_chooser::SelectedFiles, file_chooser::
 use std::{path::PathBuf, sync::Arc};
 
 pub async fn load_file(path: PathBuf) -> Result<(PathBuf, Arc<String>), anywho::Error> {
-    let contents = tokio::fs::read_to_string(&path)
+    let decoded = percent_encoding::percent_decode_str(path.to_str().unwrap_or_default())
+        .decode_utf8()
+        .map_err(|e| anywho!("{}", e))?;
+    let decoded_path = PathBuf::from(decoded.as_ref());
+
+    let contents = tokio::fs::read_to_string(&decoded_path)
         .await
         .map(Arc::new)
         .map_err(|e| anywho!("{}", e))?;
@@ -14,7 +19,12 @@ pub async fn load_file(path: PathBuf) -> Result<(PathBuf, Arc<String>), anywho::
 }
 
 pub async fn save_file(path: PathBuf, content: String) -> Result<PathBuf, anywho::Error> {
-    tokio::fs::write(&path, content)
+    let decoded = percent_encoding::percent_decode_str(path.to_str().unwrap_or_default())
+        .decode_utf8()
+        .map_err(|e| anywho!("{}", e))?;
+    let decoded_path = PathBuf::from(decoded.as_ref());
+
+    tokio::fs::write(&decoded_path, content)
         .await
         .map_err(|e| anywho!("{}", e))?;
 
