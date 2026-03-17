@@ -29,6 +29,7 @@ pub struct CedillaConfig {
     pub text_size: i32,
     pub light_highlighter_theme: CedillaHighlighterTheme,
     pub dark_highlighter_theme: CedillaHighlighterTheme,
+    pub selected_font_family: Option<String>,
 }
 
 impl Default for CedillaConfig {
@@ -57,6 +58,7 @@ impl Default for CedillaConfig {
             dark_highlighter_theme: CedillaHighlighterTheme::from(
                 cosmic::iced::highlighter::Theme::Base16Ocean,
             ),
+            selected_font_family: None,
         }
     }
 }
@@ -244,4 +246,8 @@ pub enum ConfigInput {
     UpdateLightHighlighterTheme(usize),
     /// Update the highlighter theme for dark app themes
     UpdateDarkHighlighterTheme(usize),
+    /// Update the selected font for the preview and editor tabs
+    UpdateFont(usize),
+    /// Reset to the default font
+    ResetFont,
 }
