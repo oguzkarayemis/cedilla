@@ -1,4 +1,7 @@
-use cosmic::{iced::Length, widget};
+use cosmic::{
+    iced::{Alignment, Length},
+    widget,
+};
 
 use crate::{
     MarkWidget,
@@ -10,7 +13,12 @@ use crate::{
 impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
     pub fn draw_typst(&self, source: &str) -> RenderedSpan<'a, M, T> {
         if let Some(handle) = self.state.typst_cache.borrow().get(source) {
-            return widget::image(handle.clone()).width(Length::Shrink).into();
+            return cosmic::iced_widget::column![
+                widget::image(handle.clone()).width(Length::Shrink)
+            ]
+            .width(Length::Fill)
+            .align_x(Alignment::Center)
+            .into();
         }
 
         let text_color = self.style.and_then(|s| s.text_color).unwrap_or_else(|| {
@@ -24,12 +32,14 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
             (text_color.g * 255.0) as u8,
             (text_color.b * 255.0) as u8,
         );
+        let typst_size = self.text_size * 0.6;
 
         let wrapped = format!(
             "#set page(width: auto, height: auto, margin: 4pt, fill: none)\n\
-                 #set text(fill: {})\n\
+                 #set text(fill: {}, size: {}pt)\n\
                  {}",
             color_str,
+            &typst_size,
             source.trim()
         );
 
@@ -39,7 +49,10 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
                     .typst_cache
                     .borrow_mut()
                     .insert(source.to_owned(), r.handle.clone());
-                widget::image(r.handle).width(Length::Shrink).into()
+                cosmic::iced_widget::column![widget::image(r.handle).width(Length::Shrink)]
+                    .width(Length::Fill)
+                    .align_x(Alignment::Center)
+                    .into()
             }
             Err(_) => self.codeblock(source.to_string(), self.text_size, false),
         }
