@@ -172,7 +172,10 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
                     .and_then(|c| c.strip_prefix("language-"))
                     .map(str::to_owned);
 
-                let result = if self.current_code_language.as_deref() == Some("typst") {
+                let result = if matches!(
+                    self.current_code_language.as_deref(),
+                    Some("typ") | Some("typst")
+                ) {
                     let code = extract_text(node);
                     self.draw_typst(&code)
                 } else {
