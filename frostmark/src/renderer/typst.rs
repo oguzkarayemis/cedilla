@@ -48,7 +48,8 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
                 self.state
                     .typst_cache
                     .borrow_mut()
-                    .insert(source.to_owned(), r.handle.clone());
+                    .insert(source.trim().to_owned(), r.handle.clone());
+
                 cosmic::iced_widget::column![widget::image(r.handle).width(Length::Shrink)]
                     .width(Length::Fill)
                     .align_x(Alignment::Center)
@@ -67,6 +68,7 @@ pub fn render_typst(source: &str, pixel_per_pt: f32) -> Result<TypstResult, ()> 
     let width = pixmap.width();
     let height = pixmap.height();
     let rgba = unpremultiply(pixmap.take());
+
     Ok(TypstResult {
         handle: cosmic::iced::widget::image::Handle::from_rgba(width, height, rgba),
     })

@@ -36,7 +36,7 @@ pub struct MarkState {
 
     pub(crate) selection_state: HashMap<String, widgets::text_editor::Content>,
     pub(crate) dropdown_state: HashMap<usize, bool>,
-    pub(crate) typst_cache: RefCell<HashMap<String, cosmic::iced::widget::image::Handle>>,
+    pub(crate) typst_cache: RefCell<HashMap<String, cosmic::widget::image::Handle>>,
 }
 
 impl MarkState {
@@ -158,6 +158,11 @@ impl MarkState {
         let mut storage = HashSet::new();
         find_image_links(&self.dom.document, &mut storage);
         storage
+    }
+
+    #[must_use]
+    pub fn get_typst_cache(&self) -> HashMap<String, cosmic::widget::image::Handle> {
+        self.typst_cache.borrow().clone()
     }
 }
 

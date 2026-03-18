@@ -782,6 +782,7 @@ dependencies = [
  "i18n-embed-fl",
  "icu",
  "ignore",
+ "image",
  "libcosmic",
  "open",
  "percent-encoding",
