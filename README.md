@@ -40,7 +40,9 @@ sudo just install
 
 The app has some support for [Typst](https://typst.app/) inside `code` blocks. This has been added specially for math and formulas; other Typst features may not work correctly. (But you're free to try). You can add Typst using `typ` or `typst` as the languge attribut inside a `code` block.
 
-<img src="./resources/screenshots/typst.png" width=750>
+<div align="center">
+    <img src="./resources/screenshots/typst.png" width=750>
+</div>
     
 ## Attribution
 
