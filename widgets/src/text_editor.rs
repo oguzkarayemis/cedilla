@@ -644,6 +644,8 @@ where
 
         let current_font = self.font.unwrap_or_else(|| renderer.default_font());
 
+        // Re-run the highlight when the font changes (this has been added because if not, providing a Font to text_editor breaks the syntax highlighting
+        // on first run, you need to type something to it works again)
         if internal.font != Some(current_font) {
             state.highlighter.borrow_mut().change_line(0);
             internal.font = Some(current_font);
