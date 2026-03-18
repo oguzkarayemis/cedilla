@@ -3,6 +3,7 @@
 use std::{fmt::Display, path::PathBuf, sync::LazyLock};
 
 use cosmic::{
+    Application,
     cosmic_config::{self, Config, CosmicConfigEntry, cosmic_config_derive::CosmicConfigEntry},
     theme,
 };
@@ -10,8 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::fl;
 
-const APP_ID: &str = "dev.mariinkys.Cedilla";
-const CONFIG_VERSION: u64 = 1;
+pub const CONFIG_VERSION: u64 = 1;
 
 #[derive(Debug, Clone, CosmicConfigEntry, Eq, PartialEq)]
 #[version = 1]
@@ -34,7 +34,10 @@ pub struct CedillaConfig {
 
 impl Default for CedillaConfig {
     fn default() -> Self {
-        let vault_path = dirs::data_dir().unwrap().join(APP_ID).join("vault");
+        let vault_path = dirs::data_dir()
+            .unwrap()
+            .join(crate::app::AppModel::APP_ID)
+            .join("vault");
 
         if !vault_path.exists() {
             std::fs::create_dir_all(&vault_path).expect("Failed to create vault directory");
@@ -65,7 +68,7 @@ impl Default for CedillaConfig {
 
 impl CedillaConfig {
     pub fn config_handler() -> Option<Config> {
-        Config::new(APP_ID, CONFIG_VERSION).ok()
+        Config::new(crate::app::AppModel::APP_ID, CONFIG_VERSION).ok()
     }
 
     pub fn config() -> Self {
@@ -226,6 +229,8 @@ impl From<CedillaHighlighterTheme> for cosmic::iced::highlighter::Theme {
 /// Represents the different inputs that can happen in the config [`ContextPage`]
 #[derive(Debug, Clone)]
 pub enum ConfigInput {
+    /// Automatic theme detection changed
+    SystemThemeModeChange,
     /// Update the application theme
     UpdateTheme(usize),
     /// Update the help bar show state

@@ -7,10 +7,12 @@ use crate::app::core::preview::MarkdownPreview;
 use crate::app::core::project::ProjectNode;
 use crate::app::core::utils::{self, CedillaToast, Image};
 use crate::app::dialogs::{DialogPage, DialogState};
-use crate::config::{AppTheme, BoolState, CedillaConfig, ConfigInput, ShowState};
+use crate::config::{AppTheme, BoolState, CONFIG_VERSION, CedillaConfig, ConfigInput, ShowState};
 use crate::key_binds::key_binds;
 use crate::{fl, icons};
 use cosmic::app::context_drawer;
+use cosmic::cosmic_config::Update;
+use cosmic::cosmic_theme::{self, ThemeMode};
 use cosmic::iced::{Alignment, Event, Font, Length, Padding, Subscription, highlighter};
 use cosmic::iced_core::keyboard::{Key, Modifiers};
 use cosmic::iced_widget::{center, column, row, scrollable, tooltip};
@@ -20,9 +22,10 @@ use cosmic::widget::{
     ToastId, Toasts, button, container, nav_bar, pane_grid, responsive, segmented_button, text,
     text_input, toaster,
 };
-use cosmic::{prelude::*, surface, theme};
+use cosmic::{cosmic_config, prelude::*, surface, theme};
 use frostmark::{MarkWidget, UpdateMsg};
 use slotmap::Key as SlotMapKey;
+use std::any::TypeId;
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -127,8 +130,6 @@ pub enum Message {
     LaunchUrl(String),
     /// Opens (or closes if already open) the given [`ContextPage`]
     ToggleContextPage(ContextPage),
-    /// Update the application config
-    UpdateConfig(CedillaConfig),
     /// Needed for responsive menu bar
     Surface(surface::Action),
     /// Executes the appropiate cosmic binding on keyboard shortcut
@@ -627,7 +628,7 @@ impl cosmic::Application for AppModel {
                 preview,
                 panes,
                 preview_state,
-                *&self.cedilla_font,
+                self.cedilla_font,
             ),
         };
 
@@ -641,6 +642,9 @@ impl cosmic::Application for AppModel {
     /// stopped and started conditionally based on application state, or persist
     /// indefinitely.
     fn subscription(&self) -> Subscription<Self::Message> {
+        struct ConfigSubscription;
+        struct ThemeSubscription;
+
         // Add subscriptions which are always active.
         let subscriptions = vec![
             // Watch for key_bind inputs
@@ -658,16 +662,34 @@ impl cosmic::Application for AppModel {
                 }
                 _ => None,
             }),
-            // Watch for application configuration changes.
-            self.core()
-                .watch_config::<CedillaConfig>(Self::APP_ID)
-                .map(|update| {
-                    // for why in update.errors {
-                    //     tracing::error!(?why, "app config error");
-                    // }
-
-                    Message::UpdateConfig(update.config)
-                }),
+            cosmic_config::config_subscription(
+                TypeId::of::<ConfigSubscription>(),
+                Self::APP_ID.into(),
+                CONFIG_VERSION,
+            )
+            .map(|update: Update<ThemeMode>| {
+                if !update.errors.is_empty() {
+                    eprintln!(
+                        "errors loading config {:?}: {:?}",
+                        update.keys, update.errors
+                    );
+                }
+                Message::ConfigInput(ConfigInput::SystemThemeModeChange)
+            }),
+            cosmic_config::config_subscription::<_, cosmic_theme::ThemeMode>(
+                TypeId::of::<ThemeSubscription>(),
+                cosmic_theme::THEME_MODE_ID.into(),
+                cosmic_theme::ThemeMode::version(),
+            )
+            .map(|update: Update<ThemeMode>| {
+                if !update.errors.is_empty() {
+                    eprintln!(
+                        "errors loading theme mode {:?}: {:?}",
+                        update.keys, update.errors
+                    );
+                }
+                Message::ConfigInput(ConfigInput::SystemThemeModeChange)
+            }),
         ];
 
         Subscription::batch(subscriptions)
@@ -688,7 +710,6 @@ impl cosmic::Application for AppModel {
             Message::AddToast(toast) => self.handle_add_toast(toast),
             Message::LaunchUrl(url) => self.handle_launch_url(url),
             Message::ToggleContextPage(page) => self.handle_toggle_context_page(page),
-            Message::UpdateConfig(config) => self.handle_update_config(config),
             Message::Surface(a) => self.handle_surface(a),
             Message::Key(modifiers, key) => self.handle_key(modifiers, key),
             Message::Modifiers(modifiers) => self.handle_modifiers(modifiers),
