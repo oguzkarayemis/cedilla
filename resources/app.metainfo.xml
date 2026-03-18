@@ -128,6 +128,17 @@
   </keywords>
 
   <releases>
+    <release version="0.1.3" date="2026-03-19">
+      <description>
+            <p>Added Typst support to codeblocks</p>
+            <p>Added Font selection capabilities</p>
+            <p>Fixed hot reloading of theme in Flatpak</p>
+            <p
+                >Fixed images rendering as a block (not being able to have images one next to another one)</p>
+            <p>Improved czech translation</p>
+            <p>Fixed issue that prevented the menubar from working on GNOME</p>
+      </description>
+    </release>
     <release version="0.1.2" date="2026-03-15">
         <description>
             <p
