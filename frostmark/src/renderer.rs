@@ -351,7 +351,21 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
             let height = get_attr_num(attrs, "height");
 
             if let Some(func) = self.fn_drawing_image.as_deref() {
-                return func(ImageInfo { url, width, height }).into();
+                let img: RenderedSpan<'a, M, T> = func(ImageInfo { url, width, height }).into();
+
+                // If the img itself carries an align attribute we wrap it
+                let align = get_attr(attrs, "align");
+                return match align {
+                    Some("center") | Some("centre") => widget::column![img.render()]
+                        .width(Length::Fill)
+                        .align_x(cosmic::iced::Alignment::Center)
+                        .into(),
+                    Some("right") => widget::column![img.render()]
+                        .width(Length::Fill)
+                        .align_x(cosmic::iced::Alignment::End)
+                        .into(),
+                    _ => img,
+                };
             }
         }
         // Error, no `src` tag in `<img>`
@@ -452,7 +466,19 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
                 if !row.is_empty() {
                     let mut old_row = RenderedSpan::None;
                     std::mem::swap(&mut row, &mut old_row);
-                    column.push(old_row);
+
+                    // apply alignment to flushed inline rows too
+                    if let Some(align) = data.alignment {
+                        let align: cosmic::iced::Alignment = align.into();
+                        column.push(
+                            widget::column![old_row.render()]
+                                .width(Length::Fill)
+                                .align_x(align)
+                                .into(),
+                        );
+                    } else {
+                        column.push(old_row);
+                    }
                 }
 
                 column.push(element);
@@ -610,7 +636,6 @@ fn is_block_element(node: &Node) -> bool {
             | "video"
             | "br"
             | "details"
-            | "img" // treat image as a block so that it get's correctly centered...
             | "summary" // not really block but acts like it
     )
 }
