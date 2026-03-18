@@ -30,7 +30,8 @@ percent-encoding.workspace = true
 reqwest.workspace = true
 url.workspace = true
 dissimilar.workspace = true
-icu.workspace = true
+icu_collator.workspace = true
+icu_locale.workspace = true
 font-kit.workspace = true
 
 # PDF Generation Generation
@@ -63,10 +64,11 @@ tokio = { version = "1.50.0", features = ["fs"] }
 anywho = "0.1.2"
 dirs = "6.0.0"
 ignore = "0.4.25"
-icu = { version = "2.1.1", features = ["compiled_data"] }
+icu_collator = { version = "2.1.1", features = ["compiled_data"] }
+icu_locale = { version = "2.1.1", features = ["compiled_data"] }
 slotmap = "1.1.1"
 percent-encoding = "2.3.2"
-reqwest = "0.13.2"
+reqwest = { version = "0.13.2", default-features = false, features = ["rustls"] }
 url = "2.5.8"
 base64 = "0.22.1"
 regex = "1.12.3"
@@ -122,7 +124,8 @@ opt-level = 3
 [profile.release]
 # Compile the entire crate as one unit.
 # Slows compile times, marginal improvements.
-# codegen-units = 1
+codegen-units = 1
 # Do a second optimization pass over the entire program, including dependenc.
 # Slows compile times, marginal improvements.
 lto = "thin"
+strip = true
