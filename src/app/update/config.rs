@@ -23,6 +23,9 @@ impl AppModel {
 
     pub fn handle_config_input(&mut self, input: ConfigInput) -> Task<cosmic::Action<Message>> {
         match input {
+            ConfigInput::SystemThemeModeChange => {
+                cosmic::command::set_theme(self.config.app_theme.theme())
+            }
             ConfigInput::UpdateTheme(index) => {
                 let app_theme = match index {
                     1 => AppTheme::Dark,

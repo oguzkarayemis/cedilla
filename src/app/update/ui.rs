@@ -3,7 +3,6 @@
 use crate::app::context_page::ContextPage;
 use crate::app::core::utils::CedillaToast;
 use crate::app::{AppModel, Message};
-use crate::config::CedillaConfig;
 use cosmic::iced_core::keyboard::{Key, Modifiers};
 use cosmic::widget::ToastId;
 use cosmic::{prelude::*, surface};
@@ -33,11 +32,6 @@ impl AppModel {
         page: ContextPage,
     ) -> Task<cosmic::Action<Message>> {
         page.toggle_context_page(self)
-    }
-
-    pub fn handle_update_config(&mut self, config: CedillaConfig) -> Task<cosmic::Action<Message>> {
-        self.config = config;
-        Task::none()
     }
 
     pub fn handle_surface(&mut self, a: surface::Action) -> Task<cosmic::Action<Message>> {
