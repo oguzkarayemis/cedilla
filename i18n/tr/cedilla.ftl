@@ -54,6 +54,9 @@ text-size = Metin Boyutu
 vault-default-location = Varsayılan (Uygulama Veri Dizini) 
 flatpak-permissions = Flatpak sürümü varsayılan olarak yalnızca Belgeler, İndirilenler ve Resimler klasörlerine erişim iznine sahiptir. Kasayı başka bir konuma taşımak uygulamanın düzgün çalışmamasına yol açar. Farklı dizinler kullanmak isterseniz lütfen Flatseal gibi araçlarla erişim izinlerini düzenleyin. 
 flatpak-permissions-note = Not: Bu durum görsel yükleme işlemlerini de etkiler. Yerel görseller yalnızca izin verilmiş bir klasörde bulunuyorsa yüklenebilir. 
+selected-font = Seçili Yazı Tipi
+default-font = Varsayılan Yazı Tipi
+font-selection-info = Bazı yazı tipleri çalışmayabilir. Bu durumda uygulama otomatik olarak varsayılan yazı tipine döner. Ayarlardaki seçili yazı tipi ise değişmez. Bu bir hata değildir. Beklenen davranış budur.
 
 <#-- Application MenuBar -->
 file = Dosya 
