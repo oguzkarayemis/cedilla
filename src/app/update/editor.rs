@@ -96,6 +96,7 @@ impl AppModel {
                 if !editor.search.show_search_box {
                     editor.search = EditorSearchState::default();
                     widgets::text_editor::focus(text_editor_id())
+                        .chain(scroll_to_cursor_task(editor))
                 } else {
                     cosmic::widget::text_input::focus(search_input_id())
                 }
