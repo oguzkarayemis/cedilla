@@ -7,6 +7,7 @@
   <url type="homepage">https://github.com/mariinkys/cedilla</url>
   <url type="bugtracker">https://github.com/mariinkys/cedilla/issues</url>
   <url type="donation">https://buymeacoffee.com/mariinkys</url>
+  <url type="vcs-browser">https://github.com/mariinkys/cedilla</url>
 
   <name>Cedilla</name>
   <summary>Markdown Text Editor</summary>
@@ -21,14 +22,17 @@
       distractions. Whether you're taking notes, drafting documentation, or writing blog posts,
       Cedilla provides a clean and intuitive environment for working with plain text and
       Markdown.</p>
-    <p xml:lang="cs"
+    <p
+            xml:lang="cs"
         >Cedilla je jednoduchý editor textu Markdown, navržený pro psaní bez zbytečného
       rozptylování. Ať už si děláte poznámky, připravujete dokumentaci nebo píšete blogové příspěvky,
       Cedilla nabízí čisté a intuitivní prostředí pro práci s prostým textem a také
       Markdownem.</p>
     <ul>
       <li>Clean and minimal writing interface</li>
-      <li xml:lang="cs">Čisté a minimalistické uživatelské rozhraní pro psaní</li>
+      <li
+                xml:lang="cs"
+            >Čisté a minimalistické uživatelské rozhraní pro psaní</li>
       <li>Live Markdown preview</li>
       <li xml:lang="cs">Živý náhled Markdownu</li>
       <li>Fast and lightweight</li>
@@ -39,8 +43,9 @@
     <p
         >This app has been developed with libcosmic for the COSMIC™ desktop, and issues may occur on
       other platforms</p>
-    <p xml:lang="cs"
-        >Tato aplikace byla vyvinuta za pomoci libcosmic pro prostředí COSMIC™ a na jiných platformách
+    <p
+            xml:lang="cs"
+        >Tato aplikace byla vyvinuta pomocí libcosmic pro prostředí COSMIC™. Na jiných platformách
       mohou nastat problémy.</p>
   </description>
 
@@ -67,6 +72,18 @@
       <caption>Main Page (Dark)</caption>
       <caption xml:lang="cs">Hlavní stránka (Tmavý režim)</caption>
     </screenshot>
+    <screenshot>
+      <image>
+        https://raw.githubusercontent.com/mariinkys/cedilla/main/resources/screenshots/other-light.png</image>
+      <caption>Features Showcase (Light)</caption>
+      <caption xml:lang="cs">Ukázka funkcí (Světlý režim)</caption>
+    </screenshot>
+    <screenshot>
+      <image>
+        https://raw.githubusercontent.com/mariinkys/cedilla/main/resources/screenshots/other-dark.png</image>
+      <caption>Features Showcase (Dark)</caption>
+      <caption xml:lang="cs">Ukázka funkcí (Tmavý režim)</caption>
+    </screenshot>
   </screenshots>
 
   <branding>
@@ -75,7 +92,7 @@
   </branding>
 
   <requires>
-    <display_length compare="ge">600</display_length>
+    <display_length compare="ge">650</display_length>
   </requires>
 
   <supports>
@@ -89,6 +106,7 @@
     <category>Utility</category>
     <category>Office</category>
     <category>TextTools</category>
+    <category>TextEditor</category>
   </categories>
 
   <keywords>
@@ -110,7 +128,46 @@
   </keywords>
 
   <releases>
-    <release version="0.1.0" date="2026-03-29">
+    <release version="0.1.4" date="2026-03-23">
+        <description>
+            <p>Added a Search feature</p>
+            <p>Added a Formula button to the headerbar</p>
+            <p>Allow the app to be closed using Super+Q in COSMIC</p>
+            <p>Improved turikish translation</p>
+            <p>Other fixes and improvments</p>
+        </description>
+    </release>
+    <release version="0.1.3" date="2026-03-19">
+      <description>
+            <p>Added Typst support to codeblocks</p>
+            <p>Added Font selection capabilities</p>
+            <p>Fixed hot reloading of theme in Flatpak</p>
+            <p
+                >Fixed images rendering as a block (not being able to have images one next to another one)</p>
+            <p>Improved czech translation</p>
+            <p>Other fixes and improvments</p>
+      </description>
+    </release>
+    <release version="0.1.2" date="2026-03-15">
+        <description>
+            <p
+                >Fixed issue that prevented the config from getting saved on COSMIC (breaking the app)</p>
+            <p
+                >Fixed issue with paths and filenames with non-ASCII characters and spaces</p>
+            <p>Added turkish translations</p>
+            <p>Fixed issue that prevented the menubar from working on GNOME</p>
+        </description>
+    </release>
+    <release version="0.1.1" date="2026-03-14">
+        <description>
+            <p>Changed the default window size</p>
+            <p>Improved handling of list elements</p>
+            <p>Added permissions warning to Move Vault feature</p>
+            <p
+                >Allow opening vault location in File Explorer from Settings page</p>
+        </description>
+    </release>
+    <release version="0.1.0" date="2026-03-13">
       <description>
         <p>Application Release</p>
       </description>

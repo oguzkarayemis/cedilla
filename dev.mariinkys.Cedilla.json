@@ -13,11 +13,18 @@
     "--socket=wayland",
     "--device=dri",
     "--share=network",
+    "--filesystem=xdg-documents",
+    "--filesystem=xdg-download",
+    "--filesystem=xdg-pictures",
     "--filesystem=xdg-config/cosmic:rw",
-    "--talk-name=com.system76.CosmicSettingsDaemon"
+    "--talk-name=com.system76.CosmicSettingsDaemon",
+    "--talk-name=com.system76.CosmicSettingsDaemon.*"
   ],
   "build-options": {
-    "append-path": "/usr/lib/sdk/rust-stable/bin"
+    "append-path": "/usr/lib/sdk/rust-stable/bin",
+    "env": {
+      "AWS_LC_SYS_NO_JITTER_ENTROPY": "1"
+    }
   },
   "modules": [
     {
@@ -31,7 +38,7 @@
       "build-commands": [
         "cargo --offline fetch --manifest-path Cargo.toml --verbose",
         "cargo --offline build --release --verbose",
-        "install -Dm0755 ./target/release/cedilla /app/bin/cedilla",
+        "install -Dm0755 -s ./target/release/cedilla /app/bin/cedilla",
         "install -Dm0644 ./resources/app.desktop /app/share/applications/dev.mariinkys.Cedilla.desktop",
         "install -Dm0644 ./resources/app.metainfo.xml /app/share/metainfo/dev.mariinkys.Cedilla.metainfo.xml",
         "install -Dm0644 ./resources/icons/hicolor/scalable/apps/icon.svg /app/share/icons/hicolor/scalable/apps/dev.mariinkys.Cedilla.svg"

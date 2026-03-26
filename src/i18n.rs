@@ -7,6 +7,11 @@ use i18n_embed::{
     fluent::{FluentLanguageLoader, fluent_language_loader},
     unic_langid::LanguageIdentifier,
 };
+use icu_collator::{
+    Collator, CollatorBorrowed, CollatorPreferences, options::CollatorOptions,
+    preferences::CollationNumericOrdering,
+};
+use icu_locale::Locale;
 use rust_embed::RustEmbed;
 use std::sync::LazyLock;
 
@@ -37,6 +42,27 @@ pub static LANGUAGE_LOADER: LazyLock<FluentLanguageLoader> = LazyLock::new(|| {
     loader
 });
 
+pub static LANGUAGE_SORTER: LazyLock<CollatorBorrowed> = LazyLock::new(|| {
+    let create_collator = |locale: Locale| {
+        let mut prefs = CollatorPreferences::from(locale);
+        prefs.numeric_ordering = Some(CollationNumericOrdering::True);
+        Collator::try_new(prefs, CollatorOptions::default()).ok()
+    };
+
+    Locale::try_from_str(&LANGUAGE_LOADER.current_language().to_string())
+            .ok()
+            .and_then(create_collator)
+            .or_else(|| {
+                Locale::try_from_str(&LANGUAGE_LOADER.fallback_language().to_string())
+                    .ok()
+                    .and_then(create_collator)
+            })
+            .unwrap_or_else(|| {
+                let locale = Locale::try_from_str("en-US").expect("en-US is a valid BCP-47 tag");
+                create_collator(locale)
+                    .expect("Creating a collator from the system's current language, the fallback language, or American English should succeed")
+            })
+});
 
 /// Request a localized string by ID from the i18n/ directory.
 #[macro_export]
@@ -49,4 +75,3 @@ macro_rules! fl {
         i18n_embed_fl::fl!($crate::i18n::LANGUAGE_LOADER, $message_id, $($args), *)
     }};
 }
-

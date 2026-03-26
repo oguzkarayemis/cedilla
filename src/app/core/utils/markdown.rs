@@ -30,6 +30,8 @@ pub enum SelectionAction {
     Hyperlink,
     /// Convert selection to code
     Code,
+    /// Convert selection to math
+    Math,
     /// Convert selection to image / Insert image template
     Image,
     /// Convert selection to bulleted list / Insert list item
@@ -40,6 +42,17 @@ pub enum SelectionAction {
     CheckboxList,
     /// Add horizontal rule
     Rule,
+}
+
+impl SelectionAction {
+    pub fn is_line_action(&self) -> bool {
+        matches!(
+            &self,
+            SelectionAction::BulletedList
+                | SelectionAction::NumberedList
+                | SelectionAction::CheckboxList
+        )
+    }
 }
 
 impl AppModel {
@@ -53,6 +66,15 @@ impl AppModel {
         };
 
         let selection = editor.content.selection().unwrap_or_default();
+
+        // for list actions with no selection, move to line start first
+        let is_line_action = action.is_line_action();
+        if selection.is_empty() && is_line_action {
+            editor
+                .content
+                .perform(text_editor::Action::Move(text_editor::Motion::Home));
+        };
+
         let formatted = format_selected_text(&selection, action);
         let formatted = formatted.trim_end_matches('\n').to_string();
         let formatted_len = formatted.chars().count();
@@ -63,18 +85,26 @@ impl AppModel {
                 Arc::new(formatted),
             )));
 
-        for _ in 0..formatted_len {
+        if selection.is_empty() && is_line_action {
+            // if nothing was selected and we modify the full line keep the cursor at the end
             editor
                 .content
-                .perform(text_editor::Action::Move(text_editor::Motion::Left));
+                .perform(text_editor::Action::Move(text_editor::Motion::End));
+        } else {
+            for _ in 0..formatted_len {
+                editor
+                    .content
+                    .perform(text_editor::Action::Move(text_editor::Motion::Left));
+            }
+
+            for _ in 0..formatted_len {
+                editor
+                    .content
+                    .perform(text_editor::Action::Select(text_editor::Motion::Right));
+            }
         }
 
-        for _ in 0..formatted_len {
-            editor
-                .content
-                .perform(text_editor::Action::Select(text_editor::Motion::Right));
-        }
-
+        editor.push_history();
         editor.is_dirty = true;
 
         Task::none()
@@ -82,44 +112,47 @@ impl AppModel {
 }
 
 /// Format the selected text based on the action
-fn format_selected_text(text: &str, action: SelectionAction) -> String {
-    let is_empty = text.is_empty();
+fn format_selected_text(selected_text: &str, action: SelectionAction) -> String {
+    let is_empty = selected_text.is_empty();
 
     match action {
-        SelectionAction::Heading1 => toggle_heading(text, 1),
-        SelectionAction::Heading2 => toggle_heading(text, 2),
-        SelectionAction::Heading3 => toggle_heading(text, 3),
-        SelectionAction::Heading4 => toggle_heading(text, 4),
-        SelectionAction::Heading5 => toggle_heading(text, 5),
-        SelectionAction::Heading6 => toggle_heading(text, 6),
+        SelectionAction::Heading1 => toggle_heading(selected_text, 1),
+        SelectionAction::Heading2 => toggle_heading(selected_text, 2),
+        SelectionAction::Heading3 => toggle_heading(selected_text, 3),
+        SelectionAction::Heading4 => toggle_heading(selected_text, 4),
+        SelectionAction::Heading5 => toggle_heading(selected_text, 5),
+        SelectionAction::Heading6 => toggle_heading(selected_text, 6),
 
         SelectionAction::Bold => {
             if is_empty {
                 "****".to_string()
-            } else if text.starts_with("**") && text.ends_with("**") && text.len() >= 4 {
-                text[2..text.len() - 2].to_string()
+            } else if selected_text.starts_with("**")
+                && selected_text.ends_with("**")
+                && selected_text.len() >= 4
+            {
+                selected_text[2..selected_text.len() - 2].to_string()
             } else {
-                format!("**{}**", text)
+                format!("**{}**", selected_text)
             }
         }
 
         SelectionAction::Italic => {
             if is_empty {
                 "**".to_string()
-            } else if is_italic(text) {
-                text[1..text.len() - 1].to_string()
+            } else if is_italic(selected_text) {
+                selected_text[1..selected_text.len() - 1].to_string()
             } else {
-                format!("*{}*", text)
+                format!("*{}*", selected_text)
             }
         }
 
         SelectionAction::Hyperlink => {
             if is_empty {
                 "[](url)".to_string()
-            } else if text.starts_with('[') && text.ends_with(')') {
-                text.to_string()
+            } else if selected_text.starts_with('[') && selected_text.ends_with(')') {
+                selected_text.to_string()
             } else {
-                format!("[{}](url)", text)
+                format!("[{}](url)", selected_text)
             }
         }
 
@@ -127,58 +160,79 @@ fn format_selected_text(text: &str, action: SelectionAction) -> String {
             if is_empty {
                 // cycle: nothing → inline → block → nothing
                 "``".to_string()
-            } else if text.starts_with("```") && text.ends_with("```") && text.len() > 6 {
+            } else if selected_text.starts_with("```")
+                && selected_text.ends_with("```")
+                && selected_text.len() > 6
+            {
                 // code block → nothing (strip fences)
-                let inner = &text[3..text.len() - 3];
+                let inner = &selected_text[3..selected_text.len() - 3];
                 inner.trim_matches('\n').to_string()
-            } else if text.starts_with('`') && text.ends_with('`') && text.len() >= 2 {
+            } else if selected_text.starts_with('`')
+                && selected_text.ends_with('`')
+                && selected_text.len() >= 2
+            {
                 // inline code → code block
-                let inner = &text[1..text.len() - 1];
+                let inner = &selected_text[1..selected_text.len() - 1];
                 format!("```\n{}\n```", inner)
             } else {
                 // nothing → inline code
-                format!("`{}`", text)
+                format!("`{}`", selected_text)
+            }
+        }
+
+        SelectionAction::Math => {
+            if is_empty {
+                "```typst\n\n```".to_string()
+            } else if selected_text.starts_with("```typst") && selected_text.ends_with("```") {
+                let inner = &selected_text["```typst".len()..selected_text.len() - 3];
+                inner.trim_matches('\n').to_string()
+            } else {
+                format!("```typst\n{}\n```", selected_text)
             }
         }
 
         SelectionAction::Image => {
             if is_empty {
                 "![](image-url)".to_string()
-            } else if text.starts_with("![") && text.ends_with(')') {
-                text.to_string()
+            } else if selected_text.starts_with("![") && selected_text.ends_with(')') {
+                selected_text.to_string()
             } else {
-                format!("![{}](image-url)", text)
+                format!("![{}](image-url)", selected_text)
             }
         }
 
         SelectionAction::BulletedList => {
             if is_empty {
                 "- ".to_string()
-            } else if all_lines_have_prefix(text, "- ") {
-                remove_line_prefix(text, "- ")
+            } else if all_lines_have_prefix(selected_text, "- ") {
+                remove_line_prefix(selected_text, "- ")
             } else {
-                format_list(text, "- ")
+                format_list(selected_text, "- ")
             }
         }
 
         SelectionAction::NumberedList => {
             if is_empty {
                 "1. ".to_string()
-            } else if all_lines_are_numbered(text) {
-                remove_numbered_list(text)
+            } else if all_lines_are_numbered(selected_text) {
+                remove_numbered_list(selected_text)
             } else {
-                format_numbered_list(text)
+                format_numbered_list(selected_text)
             }
         }
 
         SelectionAction::CheckboxList => {
             if is_empty {
                 "- [ ] ".to_string()
-            } else if all_lines_have_prefix(text, "- [ ] ") || all_lines_have_prefix(text, "- [x] ")
+            } else if all_lines_have_prefix(selected_text, "- [ ] ")
+                || all_lines_have_prefix(selected_text, "- [x] ")
             {
-                remove_line_prefix(remove_line_prefix(text, "- [ ] ").as_str(), "- [x] ")
+                remove_line_prefix(
+                    remove_line_prefix(selected_text, "- [ ] ").as_str(),
+                    "- [x] ",
+                )
             } else {
-                format_list(text, "- [ ] ")
+                format_list(selected_text, "- [ ] ")
             }
         }
 
@@ -288,4 +342,77 @@ fn format_numbered_list(text: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+pub fn is_list_line(line: &str) -> bool {
+    let trimmed = line.trim_start_matches(' ');
+    strip_numbered_prefix(trimmed).is_some()
+        || trimmed.starts_with("- ")
+        || trimmed.starts_with("* ")
+        || trimmed.starts_with("+ ")
+        || trimmed.starts_with("- [ ] ")
+        || trimmed.starts_with("- [x] ")
+}
+
+/// If the current line is a list item, returns the prefix to continue with on the next line.
+/// Returns Some("") if the line is an empty list item (break  out of the list).
+/// Returns None if not a list line.
+pub fn get_list_continuation(content: &text_editor::Content) -> Option<String> {
+    let cursor_line = content.cursor().position.line;
+    let line = content.line(cursor_line)?.text;
+
+    let indent = leading_indent(&line);
+    let trimmed = &line[indent.len()..];
+
+    // Numbered list
+    if let Some(rest) = strip_numbered_prefix(trimmed) {
+        if rest.trim().is_empty() {
+            return Some(String::new()); // empty item, break out
+        }
+        // find current number and increment
+        let num = current_list_number(trimmed)?;
+        return Some(format!("{}. ", num + 1));
+    }
+
+    // Checkbox list (before bullet check since it also starts with "- ")
+    for prefix in &["- [ ] ", "- [x] "] {
+        if let Some(rest) = trimmed.strip_prefix(prefix) {
+            if rest.trim().is_empty() {
+                return Some(String::new());
+            }
+            return Some("- [ ] ".to_string()); // insert unchecked
+        }
+    }
+
+    // Bullet list
+    for prefix in &["- ", "* ", "+ "] {
+        if let Some(rest) = trimmed.strip_prefix(prefix) {
+            if rest.trim().is_empty() {
+                return Some(String::new());
+            }
+            return Some(prefix.to_string());
+        }
+    }
+
+    None
+}
+
+fn leading_indent(line: &str) -> &str {
+    let trimmed = line.trim_start_matches(' ');
+    &line[..line.len() - trimmed.len()]
+}
+
+fn strip_numbered_prefix(line: &str) -> Option<&str> {
+    let dot_pos = line.find(". ")?;
+    let num_part = &line[..dot_pos];
+    if num_part.chars().all(|c| c.is_ascii_digit()) && !num_part.is_empty() {
+        Some(&line[dot_pos + 2..])
+    } else {
+        None
+    }
+}
+
+fn current_list_number(line: &str) -> Option<usize> {
+    let dot_pos = line.find(". ")?;
+    line[..dot_pos].parse().ok()
 }

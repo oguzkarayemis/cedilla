@@ -5,14 +5,18 @@ use crate::app::context_page::ContextPage;
 use crate::app::core::editor::EditorState;
 use crate::app::core::preview::MarkdownPreview;
 use crate::app::core::project::ProjectNode;
+use crate::app::core::utils::search::SearchAction;
 use crate::app::core::utils::{self, CedillaToast, Image};
 use crate::app::dialogs::{DialogPage, DialogState};
-use crate::config::{AppTheme, BoolState, CedillaConfig, ConfigInput, ShowState};
+use crate::config::{AppTheme, BoolState, CONFIG_VERSION, CedillaConfig, ConfigInput, ShowState};
 use crate::key_binds::key_binds;
 use crate::{fl, icons};
 use cosmic::app::context_drawer;
-use cosmic::iced::{Alignment, Event, Font, Length, Padding, Subscription, highlighter, window};
+use cosmic::cosmic_config::Update;
+use cosmic::cosmic_theme::{self, ThemeMode};
+use cosmic::iced::{Alignment, Event, Font, Length, Padding, Subscription, highlighter};
 use cosmic::iced_core::keyboard::{Key, Modifiers};
+use cosmic::iced_core::window;
 use cosmic::iced_widget::{center, column, row, scrollable, tooltip};
 use cosmic::widget::space::horizontal;
 use cosmic::widget::{self, about::About, menu};
@@ -20,9 +24,10 @@ use cosmic::widget::{
     ToastId, Toasts, button, container, nav_bar, pane_grid, responsive, segmented_button, text,
     text_input, toaster,
 };
-use cosmic::{prelude::*, surface, theme};
+use cosmic::{cosmic_config, prelude::*, surface, theme};
 use frostmark::{MarkWidget, UpdateMsg};
 use slotmap::Key as SlotMapKey;
+use std::any::TypeId;
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -65,6 +70,10 @@ pub struct AppModel {
     config: CedillaConfig,
     // Application Themes
     app_themes: Vec<String>,
+    // Fonts available in the system
+    system_fonts: Vec<String>,
+    /// Editor and preview fonts
+    cedilla_font: Font,
     // Syntax Highlighting Themes
     highlighter_themes: Vec<String>,
     /// Currently selected path on the navbar (i need these for accurate file creadtion deletion...)
@@ -123,8 +132,6 @@ pub enum Message {
     LaunchUrl(String),
     /// Opens (or closes if already open) the given [`ContextPage`]
     ToggleContextPage(ContextPage),
-    /// Update the application config
-    UpdateConfig(CedillaConfig),
     /// Needed for responsive menu bar
     Surface(surface::Action),
     /// Executes the appropiate cosmic binding on keyboard shortcut
@@ -178,6 +185,8 @@ pub enum Message {
     Undo,
     /// Redo requested
     Redo,
+    /// Search related action requested
+    Search(SearchAction),
 
     /// Update the HTML renderer state
     UpdateMarkState(UpdateMsg),
@@ -195,10 +204,13 @@ pub enum Message {
     /// Callback after input on the Config [`ContextPage`]
     ConfigInput(ConfigInput),
 
+    /// Open the given path in the default file explorer
+    OpenInFileExplorer(PathBuf),
+
     /// Export current document to PDF
     ExportPDF,
     /// Callback after using asks to close the app
-    AppCloseRequested(window::Id),
+    AppCloseRequested,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -208,6 +220,8 @@ pub enum NavMenuAction {
     RenameNode(segmented_button::Entity),
     MoveNode(segmented_button::Entity),
     OpenNodeFileManager(segmented_button::Entity),
+    OpenFolderCreationDialog(segmented_button::Entity),
+    OpenVaultFileCreationDialog(segmented_button::Entity),
 }
 
 impl cosmic::widget::menu::Action for NavMenuAction {
@@ -258,6 +272,21 @@ impl cosmic::Application for AppModel {
 
         let gotenberg_url = flags.config.gotenberg_url.clone();
 
+        let font = if let Some(ref name) = flags.config.selected_font_family {
+            let static_name: &'static str = Box::leak(name.clone().into_boxed_str());
+            Font {
+                family: cosmic::iced::font::Family::Name(static_name),
+                weight: cosmic::iced::font::Weight::Normal,
+                stretch: cosmic::iced::font::Stretch::Normal,
+                style: cosmic::iced::font::Style::Normal,
+            }
+        } else {
+            Font::DEFAULT
+        };
+
+        let mut font_options = vec![fl!("default-font")];
+        font_options.extend(flags.system_fonts.iter().cloned());
+
         // Construct the app model with the runtime's core.
         let mut app = AppModel {
             toasts: Toasts::new(Message::CloseToast),
@@ -273,6 +302,8 @@ impl cosmic::Application for AppModel {
             config_handler: flags.config_handler,
             config: flags.config,
             app_themes: vec![fl!("match-desktop"), fl!("dark"), fl!("light")],
+            system_fonts: font_options,
+            cedilla_font: font,
             highlighter_themes: highlighter::Theme::ALL
                 .iter()
                 .map(|t| t.to_string())
@@ -322,7 +353,7 @@ impl cosmic::Application for AppModel {
 
     /// Elements to pack at the start of the header bar.
     fn header_start(&self) -> Vec<Element<'_, Self::Message>> {
-        vec![app_menu::menu_bar(&self.core, &self.key_binds)]
+        vec![app_menu::menu_bar(&self.key_binds)]
     }
 
     /// Elements to pack at the end of the header bar.
@@ -411,6 +442,10 @@ impl cosmic::Application for AppModel {
             return Some(vec![]);
         }
 
+        // All of the weird code with the ButtonDisabled stuff is because there seems to be many issues
+        // with menu_inner crashing the app if there are more items in some context menus so all menus
+        // must have the same number of items
+
         // only one entry for root node
         if self.nav_model.indent(entity).unwrap_or(0) == 0 {
             return Some(cosmic::widget::menu::items(
@@ -436,6 +471,16 @@ impl cosmic::Application for AppModel {
                         None,
                         NavMenuAction::OpenNodeFileManager(entity),
                     ),
+                    cosmic::widget::menu::Item::Button(
+                        fl!("new-folder"),
+                        None,
+                        NavMenuAction::OpenFolderCreationDialog(entity),
+                    ),
+                    cosmic::widget::menu::Item::Button(
+                        fl!("new-vault-file"),
+                        None,
+                        NavMenuAction::OpenVaultFileCreationDialog(entity),
+                    ),
                 ],
             ));
         }
@@ -443,7 +488,7 @@ impl cosmic::Application for AppModel {
         // no need to use this for now as we don't have different context menu options for files and folders
         //let node = self.nav_model.data::<ProjectNode>(entity)?;
 
-        let mut items = Vec::with_capacity(4);
+        let mut items = Vec::with_capacity(6);
 
         items.push(cosmic::widget::menu::Item::Button(
             fl!("delete"),
@@ -464,6 +509,17 @@ impl cosmic::Application for AppModel {
             fl!("open-file-manager"),
             None,
             NavMenuAction::OpenNodeFileManager(entity),
+        ));
+        // If the entity is a file both creation dialogs will store the new folder/file in the parent folder
+        items.push(cosmic::widget::menu::Item::Button(
+            fl!("new-folder"),
+            None,
+            NavMenuAction::OpenFolderCreationDialog(entity),
+        ));
+        items.push(cosmic::widget::menu::Item::Button(
+            fl!("new-vault-file"),
+            None,
+            NavMenuAction::OpenVaultFileCreationDialog(entity),
         ));
 
         Some(cosmic::widget::menu::items(
@@ -570,7 +626,14 @@ impl cosmic::Application for AppModel {
                 panes,
                 preview_state,
                 ..
-            } => cedilla_main_view(&self.config, editor, preview, panes, preview_state),
+            } => cedilla_main_view(
+                &self.config,
+                editor,
+                preview,
+                panes,
+                preview_state,
+                self.cedilla_font,
+            ),
         };
 
         toaster(&self.toasts, container(content).center(Length::Fill))
@@ -583,6 +646,9 @@ impl cosmic::Application for AppModel {
     /// stopped and started conditionally based on application state, or persist
     /// indefinitely.
     fn subscription(&self) -> Subscription<Self::Message> {
+        struct ConfigSubscription;
+        struct ThemeSubscription;
+
         // Add subscriptions which are always active.
         let subscriptions = vec![
             // Watch for key_bind inputs
@@ -598,25 +664,44 @@ impl cosmic::Application for AppModel {
                 Event::Keyboard(cosmic::iced::keyboard::Event::ModifiersChanged(modifiers)) => {
                     Some(Message::Modifiers(modifiers))
                 }
+                Event::Window(window::Event::CloseRequested) => Some(Message::AppCloseRequested),
                 _ => None,
             }),
-            // Watch for application configuration changes.
-            self.core()
-                .watch_config::<CedillaConfig>(Self::APP_ID)
-                .map(|update| {
-                    // for why in update.errors {
-                    //     tracing::error!(?why, "app config error");
-                    // }
-
-                    Message::UpdateConfig(update.config)
-                }),
+            cosmic_config::config_subscription(
+                TypeId::of::<ConfigSubscription>(),
+                Self::APP_ID.into(),
+                CONFIG_VERSION,
+            )
+            .map(|update: Update<ThemeMode>| {
+                if !update.errors.is_empty() {
+                    eprintln!(
+                        "errors loading config {:?}: {:?}",
+                        update.keys, update.errors
+                    );
+                }
+                Message::ConfigInput(ConfigInput::SystemThemeModeChange)
+            }),
+            cosmic_config::config_subscription::<_, cosmic_theme::ThemeMode>(
+                TypeId::of::<ThemeSubscription>(),
+                cosmic_theme::THEME_MODE_ID.into(),
+                cosmic_theme::ThemeMode::version(),
+            )
+            .map(|update: Update<ThemeMode>| {
+                if !update.errors.is_empty() {
+                    eprintln!(
+                        "errors loading theme mode {:?}: {:?}",
+                        update.keys, update.errors
+                    );
+                }
+                Message::ConfigInput(ConfigInput::SystemThemeModeChange)
+            }),
         ];
 
         Subscription::batch(subscriptions)
     }
 
-    fn on_close_requested(&self, id: window::Id) -> Option<Message> {
-        Some(Message::AppCloseRequested(id))
+    fn on_app_exit(&mut self) -> Option<Self::Message> {
+        Some(Message::AppCloseRequested)
     }
 
     /// Handles messages emitted by the application and its widgets.
@@ -630,7 +715,6 @@ impl cosmic::Application for AppModel {
             Message::AddToast(toast) => self.handle_add_toast(toast),
             Message::LaunchUrl(url) => self.handle_launch_url(url),
             Message::ToggleContextPage(page) => self.handle_toggle_context_page(page),
-            Message::UpdateConfig(config) => self.handle_update_config(config),
             Message::Surface(a) => self.handle_surface(a),
             Message::Key(modifiers, key) => self.handle_key(modifiers, key),
             Message::Modifiers(modifiers) => self.handle_modifiers(modifiers),
@@ -665,6 +749,7 @@ impl cosmic::Application for AppModel {
             Message::ApplyFormatting(action) => self.handle_apply_formatting(action),
             Message::Undo => self.handle_undo(),
             Message::Redo => self.handle_redo(),
+            Message::Search(action) => self.handle_search(action),
 
             // Preview / Pane
             Message::UpdateMarkState(msg) => self.handle_update_mark_state(msg),
@@ -678,8 +763,9 @@ impl cosmic::Application for AppModel {
             Message::ConfigInput(input) => self.handle_config_input(input),
 
             // Others
+            Message::OpenInFileExplorer(path) => self.handle_open_in_file_explorer(&path),
             Message::ExportPDF => self.handle_export_pdf(),
-            Message::AppCloseRequested(id) => self.handle_app_close_requested(id),
+            Message::AppCloseRequested => self.handle_app_close_requested(),
         }
     }
 }
@@ -712,6 +798,27 @@ impl AppModel {
             .iter()
             .position(|t| *t == self.config.dark_highlighter_theme.0);
 
+        let location_label = if let (Ok(vault), Ok(data_dir)) = (
+            self.config.vault_path().canonicalize(),
+            dirs::data_dir().unwrap().canonicalize(),
+        ) {
+            if vault.starts_with(data_dir) {
+                fl!("vault-default-location")
+            } else {
+                self.config.vault_path.to_string()
+            }
+        } else {
+            self.config.vault_path.to_string()
+        };
+
+        let font_selected = self
+            .config
+            .selected_font_family
+            .as_ref()
+            .and_then(|name| self.system_fonts.iter().position(|f| f == name))
+            .map(|i| i + 1) // offset by 1 because "Default" is at index 0
+            .unwrap_or(0);
+
         widget::settings::view_column(vec![
             widget::settings::section()
                 .title(fl!("appearance"))
@@ -736,19 +843,74 @@ impl AppModel {
                         }),
                     ),
                 )
+                .add(
+                    widget::settings::item::builder(fl!("selected-font")).control(
+                        row![
+                            widget::dropdown(&self.system_fonts, Some(font_selected), |index| {
+                                if index == 0 {
+                                    Message::ConfigInput(ConfigInput::ResetFont)
+                                } else {
+                                    Message::ConfigInput(ConfigInput::UpdateFont(index - 1))
+                                }
+                            }),
+                            widget::tooltip(
+                                widget::icon(icons::get_handle("dialog-information-symbolic", 18)),
+                                container(text(fl!("font-selection-info")))
+                                    .padding(6.)
+                                    .max_width(250.),
+                                tooltip::Position::Left
+                            ),
+                        ]
+                        .align_y(Alignment::Center)
+                        .spacing(cosmic::theme::spacing().space_xxs),
+                    ),
+                )
                 .into(),
             widget::settings::section()
                 .title(fl!("general"))
                 .add(
-                    widget::settings::item::builder(fl!("move-vault"))
-                        .description(fl!(
-                            "current-location",
-                            location = self.config.vault_path.to_string()
-                        ))
-                        .control(
+                    cosmic::widget::column::with_children(vec![
+                        row![
+                            text::body(fl!("move-vault")),
+                            horizontal(),
+                            widget::tooltip(
+                                widget::icon(icons::get_handle("dialog-information-symbolic", 18)),
+                                container(
+                                    column![
+                                        text(fl!("flatpak-permissions")),
+                                        text(fl!("flatpak-permissions-note"))
+                                    ]
+                                    .spacing(10.)
+                                )
+                                .padding(6.)
+                                .max_width(250.),
+                                tooltip::Position::Left
+                            ),
+                        ]
+                        .align_y(Alignment::Center)
+                        .into(),
+                        row![
+                            column![
+                                text::body(fl!("current-location")),
+                                button::custom(
+                                    text(location_label)
+                                        .wrapping(cosmic::iced_core::text::Wrapping::Glyph)
+                                        .width(Length::Fill)
+                                )
+                                .on_press(Message::OpenInFileExplorer(PathBuf::from(
+                                    self.config.vault_path.clone()
+                                )))
+                                .class(theme::Button::Link)
+                            ]
+                            .width(Length::FillPortion(1)),
                             widget::button::destructive(fl!("move-vault"))
-                                .on_press(Message::MoveVault),
-                        ),
+                                .on_press(Message::MoveVault)
+                                .width(Length::Shrink)
+                        ]
+                        .align_y(Alignment::Center)
+                        .into(),
+                    ])
+                    .spacing(cosmic::theme::spacing().space_xxs),
                 )
                 .add(
                     widget::settings::item::builder(fl!("last-file")).control(widget::dropdown(
@@ -848,11 +1010,12 @@ fn cedilla_main_view<'a>(
     preview: &'a MarkdownPreview,
     panes: &'a pane_grid::State<PaneContent>,
     preview_state: &'a PreviewState,
+    font: Font,
 ) -> Element<'a, Message> {
     let spacing = theme::active().cosmic().spacing;
 
-    let create_editor = || {
-        container(responsive(|size| {
+    let create_editor = move || {
+        container(responsive(move |size| {
             let highlighter_theme: highlighter::Theme = match app_config.app_theme {
                 AppTheme::Dark => app_config.dark_highlighter_theme.into(),
                 AppTheme::Light => app_config.light_highlighter_theme.into(),
@@ -867,6 +1030,7 @@ fn cedilla_main_view<'a>(
 
             scrollable(
                 TextEditor::new(&editor.content)
+                    .id(text_editor_id())
                     .highlight_with::<highlighter::Highlighter>(
                         highlighter::Settings {
                             theme: highlighter_theme,
@@ -880,8 +1044,9 @@ fn cedilla_main_view<'a>(
                         |highlight, _theme| highlight.to_format(),
                     )
                     .size(app_config.text_size)
+                    .font(font)
                     .padding(0)
-                    .retain_focus_on_external_click(true)
+                    .retain_focus_on_external_click(!editor.search.show_search_box)
                     .on_action(Message::Edit),
             )
             .id(editor_scrollable_id())
@@ -944,6 +1109,7 @@ fn cedilla_main_view<'a>(
                         MarkWidget::new(&preview.markstate)
                             .on_updating_state(Message::UpdateMarkState)
                             .on_clicking_link(Message::LaunchUrl)
+                            .font(font)
                             .text_size(app_config.text_size)
                             .code_highlight_theme(highlighter_theme)
                             .on_drawing_image(|info| {
@@ -1043,6 +1209,8 @@ fn cedilla_main_view<'a>(
                     .on_press(Message::ApplyFormatting(utils::SelectionAction::Hyperlink)),
                 button::icon(icons::get_handle("helperbar/code-symbolic", 18))
                     .on_press(Message::ApplyFormatting(utils::SelectionAction::Code)),
+                button::icon(icons::get_handle("helperbar/math-symbolic", 18))
+                    .on_press(Message::ApplyFormatting(utils::SelectionAction::Math)),
                 button::icon(icons::get_handle("helperbar/image-symbolic", 18))
                     .on_press(Message::ApplyFormatting(utils::SelectionAction::Image)),
                 horizontal().width(18.),
@@ -1085,7 +1253,7 @@ fn cedilla_main_view<'a>(
         content_column
     };
 
-    container(content_column)
+    let base: Element<Message> = container(content_column)
         .padding(
             Padding::new(spacing.space_xxs as f32)
                 .left(0.)
@@ -1094,7 +1262,62 @@ fn cedilla_main_view<'a>(
         )
         .width(Length::Fill)
         .height(Length::Fill)
-        .into()
+        .into();
+
+    if !editor.search.show_search_box {
+        base
+    } else {
+        let match_status: String = match editor.search.current_match_index {
+            _ if editor.search.regex_error.is_some() => editor.search.regex_error.clone().unwrap(),
+            Some(i) => format!("{}/{}", i + 1, editor.search.matches.len()),
+            None if editor.search.search_value.is_empty() => String::new(),
+            None => fl!("no-results"),
+        };
+
+        let search_box = container(
+            row![
+                text_input(fl!("search"), &editor.search.search_value)
+                    .id(search_input_id())
+                    .on_focus(Message::Search(SearchAction::FocusSearchField))
+                    .on_input(|v| Message::Search(SearchAction::UpdateSearchValue(v)))
+                    .on_submit(|_v| Message::Search(SearchAction::NextResult))
+                    .width(Length::Fixed(200.)),
+                button::icon(icons::get_handle("go-up-symbolic", 16))
+                    .on_press(Message::Search(SearchAction::PrevResult))
+                    .class(theme::Button::Icon),
+                button::icon(icons::get_handle("go-down-symbolic", 16))
+                    .on_press(Message::Search(SearchAction::NextResult))
+                    .class(theme::Button::Icon),
+                button::icon(icons::get_handle("regex-symbolic", 18))
+                    .on_press(Message::Search(SearchAction::ToggleRegex))
+                    .class(if editor.search.use_regex {
+                        theme::Button::Suggested
+                    } else {
+                        theme::Button::Standard
+                    }),
+                text(match_status).size(12),
+                button::icon(icons::get_handle("window-close-symbolic", 16))
+                    .on_press(Message::Search(SearchAction::ToggleSearch))
+                    .class(theme::Button::Icon),
+            ]
+            .spacing(spacing.space_xxs)
+            .align_y(Alignment::Center)
+            .padding(spacing.space_xs),
+        )
+        .class(theme::Container::Background)
+        .width(Length::Shrink);
+
+        let overlay = container(search_box)
+            .align_right(Length::Fill)
+            .align_top(Length::Fill)
+            .padding(
+                Padding::new(0.)
+                    .top(spacing.space_xs as f32)
+                    .right(spacing.space_s as f32),
+            );
+
+        cosmic::iced_widget::stack!(base, overlay).into()
+    }
 }
 
 /// Returns the text editor scrollable Id
@@ -1105,6 +1328,16 @@ fn editor_scrollable_id() -> widget::Id {
 /// Returns the cotnent preview scrollable Id
 fn preview_scrollable_id() -> widget::Id {
     widget::Id::new("preview_scroll")
+}
+
+/// Returns the text editor id
+fn text_editor_id() -> widgets::text_editor::Id {
+    widgets::text_editor::Id::from(widget::Id::new("text_editor"))
+}
+
+/// Returns the search input id
+pub fn search_input_id() -> widget::Id {
+    widget::Id::new("search_input")
 }
 
 /// Creates the default panes for the app

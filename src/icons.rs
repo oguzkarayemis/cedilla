@@ -40,6 +40,8 @@ impl IconCache {
         bundle!("hide-symbolic", 18);
         bundle!("edit-symbolic", 18);
         bundle!("markdown-symbolic", 18);
+        bundle!("dialog-information-symbolic", 18);
+        bundle!("regex-symbolic", 18);
 
         bundle!("helperbar/bold-symbolic", 18);
         bundle!("helperbar/bulleted-list-symbolic", 18);
@@ -52,6 +54,7 @@ impl IconCache {
         bundle!("helperbar/numbered-list-symbolic", 18);
         bundle!("helperbar/rule-symbolic", 18);
         bundle!("helperbar/pdf-symbolic", 18);
+        bundle!("helperbar/math-symbolic", 18);
 
         Self { cache }
     }

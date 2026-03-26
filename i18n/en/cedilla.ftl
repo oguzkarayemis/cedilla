@@ -39,7 +39,7 @@ general = General
 help-bar = Editor Help Bar
 status-bar = Status Bar
 move-vault = Move Vault
-current-location = Current Location: { $location }
+current-location = Current Location:
 show = Show
 hide = Hide
 last-file = Open the last file when the app starts
@@ -51,6 +51,12 @@ gotenberg-url = Set the Gotenberg server URL
 apply = Apply
 more-info = More Info
 text-size = Text Size
+vault-default-location = Default (App Data Directory)
+flatpak-permissions = By default, the Flatpak version only has permissions for the Documents, Downloads, and Pictures folders. Moving the vault to any other location will make the app stop working correctly. If you want to use other directories, please tweak the permissions with tools like Flatseal.
+flatpak-permissions-note = Note, this also affects image loading. Local images will only load if they are in a folder with permissions.
+selected-font = Selected Font
+default-font = Default Font
+font-selection-info = Some fonts will not work, and the app will automatically fall back to the default font (without changing the selected font in the settings). That is not a bug; it is the intended behavior.
 
 <#-- Application MenuBar -->
 file = File
@@ -79,3 +85,7 @@ bullet-list = Bulleted List
 numbered-list = Numbered List
 checkbox = Checkbox
 horizontal-rule = Horizontal Rule
+
+<#-- Search -->
+search = Search
+no-results = No Results

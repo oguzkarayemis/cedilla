@@ -309,7 +309,7 @@ impl AppModel {
             Some(ProjectNode::Folder { open: true, .. })
         );
 
-        // if target is closed, don't insert anything — on_nav_select will
+        // if target is closed, don't insert anything, on_nav_select will
         // populate it correctly from disk when the user opens it
         if !target_is_open {
             return;
@@ -506,11 +506,21 @@ impl ProjectNode {
 
 impl Ord for ProjectNode {
     fn cmp(&self, other: &Self) -> Ordering {
-        match (self, other) {
-            (Self::Folder { .. }, Self::File { .. }) => Ordering::Less,
-            (Self::File { .. }, Self::Folder { .. }) => Ordering::Greater,
-            _ => self.name().cmp(other.name()),
+        match self {
+            // Folders are always before files
+            Self::Folder { .. } => {
+                if let Self::File { .. } = other {
+                    return Ordering::Less;
+                }
+            }
+            // Files are always after folders
+            Self::File { .. } => {
+                if let Self::Folder { .. } = other {
+                    return Ordering::Greater;
+                }
+            }
         }
+        crate::i18n::LANGUAGE_SORTER.compare(self.name(), other.name())
     }
 }
 
