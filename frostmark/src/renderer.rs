@@ -547,7 +547,7 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
             let editor = TextEditor::new(state)
                 .is_code_block(true)
                 .size(size)
-                .padding(5)
+                .padding(20)
                 .font(self.font_mono)
                 .on_action(on_action);
 
