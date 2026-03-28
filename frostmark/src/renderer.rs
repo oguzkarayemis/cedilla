@@ -150,12 +150,12 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
                 .padding(Padding::default().top(4.0).bottom(4.0))
                 .into(),
 
-            "h1" => padded_heading(self.render_children(node, data.heading(1)), 28.0, 14.0),
-            "h2" => padded_heading(self.render_children(node, data.heading(2)), 22.0, 11.0),
-            "h3" => padded_heading(self.render_children(node, data.heading(3)), 18.0, 9.0),
-            "h4" => padded_heading(self.render_children(node, data.heading(4)), 14.0, 7.0),
-            "h5" => padded_heading(self.render_children(node, data.heading(5)), 10.0, 5.0),
-            "h6" => padded_heading(self.render_children(node, data.heading(6)), 8.0, 4.0),
+            "h1" => padded_heading(self.render_children(node, data.heading(1)), 10.0),
+            "h2" => padded_heading(self.render_children(node, data.heading(2)), 8.0),
+            "h3" => padded_heading(self.render_children(node, data.heading(3)), 6.0),
+            "h4" => padded_heading(self.render_children(node, data.heading(4)), 4.0),
+            "h5" => padded_heading(self.render_children(node, data.heading(5)), 3.0),
+            "h6" => padded_heading(self.render_children(node, data.heading(6)), 3.0),
             "sub" => self.render_children(node, data.heading(7)),
             "sup" => RenderedSpan::Spans(vec![
                 widget::span(to_superscript(&extract_text(node))).size(self.text_size),
@@ -660,11 +660,10 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> From<MarkWidget<'a, M, T>> for 
 /// Adds vertical breathing room to a heading
 fn padded_heading<'a, M: Clone + 'static, T: ValidTheme + 'a>(
     inner: RenderedSpan<'a, M, T>,
-    top: f32,
-    bottom: f32,
+    padding: f32,
 ) -> RenderedSpan<'a, M, T> {
     widget::column![inner.render()]
-        .padding(Padding::default().top(top).bottom(bottom))
+        .padding(Padding::default().top(padding).bottom(padding))
         .into()
 }
 
