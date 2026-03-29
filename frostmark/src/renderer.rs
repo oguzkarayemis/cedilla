@@ -82,9 +82,23 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
                     RenderedSpan::Spans(vec![{
                         t = t.font({
                             let mut f = self.font;
+
+                            let heading_weight = match data.heading_weight {
+                                1 => cosmic::iced::font::Weight::Black,
+                                2 => cosmic::iced::font::Weight::Bold,
+                                3 => cosmic::iced::font::Weight::Semibold,
+                                4 => cosmic::iced::font::Weight::Medium,
+                                5 => cosmic::iced::font::Weight::Normal,
+                                6 => cosmic::iced::font::Weight::Light,
+                                _ => f.weight,
+                            };
+
                             if data.flags.contains(ChildDataFlags::BOLD) {
                                 f.weight = cosmic::iced::font::Weight::Bold;
+                            } else if (1..=6).contains(&data.heading_weight) {
+                                f.weight = heading_weight;
                             }
+
                             if data.flags.contains(ChildDataFlags::ITALIC) {
                                 f.style = cosmic::iced::font::Style::Italic;
                             }
