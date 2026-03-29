@@ -4,9 +4,12 @@ use crate::app::core::editor::{EditorScrollState, EditorSearchState, EditorState
 use crate::app::core::history::HistoryState;
 use crate::app::core::preview::MarkdownPreview;
 use crate::app::core::utils::{self, CedillaToast};
-use crate::app::{AppModel, Message, PreviewState, State};
+use crate::app::{
+    AppModel, Message, PreviewState, State, editor_scrollable_id, preview_scrollable_id,
+};
 use crate::app::{DiscardChangesAction, create_default_panes};
 use crate::config::{BoolState, ShowState};
+use cosmic::iced_widget::scrollable::scroll_to;
 use cosmic::prelude::*;
 use frostmark::MarkState;
 use std::collections::{HashMap, HashSet};
@@ -72,7 +75,12 @@ impl AppModel {
                 content: text_editor::Content::new(),
                 is_dirty: true,
                 history: HistoryState::default(),
-                scroll: EditorScrollState::default(),
+                scroll: EditorScrollState {
+                    // pre-absorb the programmatic resets we're about to fire
+                    pending_editor_scrolls: 1,
+                    pending_preview_scrolls: 1,
+                    ..EditorScrollState::default()
+                },
                 search: EditorSearchState::default(),
             },
             preview: MarkdownPreview {
@@ -84,7 +92,13 @@ impl AppModel {
             panes,
             preview_state: PreviewState::Shown,
         };
-        Task::none()
+
+        Task::batch([
+            scroll_to(editor_scrollable_id(), crate::app::utils::scroll::abs(0.0))
+                .map(cosmic::action::app),
+            scroll_to(preview_scrollable_id(), crate::app::utils::scroll::abs(0.0))
+                .map(cosmic::action::app),
+        ])
     }
 
     pub fn handle_new_vault_file(&mut self, file_name: String) -> Task<cosmic::Action<Message>> {
@@ -122,7 +136,12 @@ impl AppModel {
                 content: text_editor::Content::new(),
                 is_dirty: true,
                 history: HistoryState::default(),
-                scroll: EditorScrollState::default(),
+                scroll: EditorScrollState {
+                    // pre-absorb the programmatic resets we're about to fire
+                    pending_editor_scrolls: 1,
+                    pending_preview_scrolls: 1,
+                    ..EditorScrollState::default()
+                },
                 search: EditorSearchState::default(),
             },
             preview: MarkdownPreview {
@@ -135,7 +154,12 @@ impl AppModel {
             preview_state: PreviewState::Shown,
         };
 
-        Task::none()
+        Task::batch([
+            scroll_to(editor_scrollable_id(), crate::app::utils::scroll::abs(0.0))
+                .map(cosmic::action::app),
+            scroll_to(preview_scrollable_id(), crate::app::utils::scroll::abs(0.0))
+                .map(cosmic::action::app),
+        ])
     }
 
     pub fn handle_new_vault_folder(
@@ -227,7 +251,12 @@ impl AppModel {
                         content: text_editor::Content::with_text(content.as_ref()),
                         is_dirty: false,
                         history: HistoryState::new_with_content(content.to_string()),
-                        scroll: EditorScrollState::default(),
+                        scroll: EditorScrollState {
+                            // pre-absorb the programmatic resets we're about to fire
+                            pending_editor_scrolls: 1,
+                            pending_preview_scrolls: 1,
+                            ..EditorScrollState::default()
+                        },
                         search: EditorSearchState::default(),
                     },
                     preview: MarkdownPreview {
@@ -240,6 +269,14 @@ impl AppModel {
                     preview_state: PreviewState::Shown,
                 };
 
+                let reset_editor =
+                    scroll_to(editor_scrollable_id(), crate::app::utils::scroll::abs(0.0))
+                        .map(cosmic::action::app);
+
+                let reset_preview =
+                    scroll_to(preview_scrollable_id(), crate::app::utils::scroll::abs(0.0))
+                        .map(cosmic::action::app);
+
                 if let State::Ready {
                     editor, preview, ..
                 } = &mut self.state
@@ -248,7 +285,9 @@ impl AppModel {
                         &mut preview.markstate,
                         &mut preview.images_in_progress,
                         &editor.path,
-                    );
+                    )
+                    .chain(reset_editor)
+                    .chain(reset_preview);
                 }
 
                 Task::none()
