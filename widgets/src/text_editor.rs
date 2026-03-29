@@ -505,6 +505,17 @@ where
     pub fn is_empty(&self) -> bool {
         self.0.borrow().editor.is_empty()
     }
+
+    /// Replaces the current text cleanly without destroying the editor state.
+    /// This preserves the internal view state and scroll offsets.
+    pub fn replace_text(&mut self, new_text: &str) {
+        let mut internal = self.0.borrow_mut();
+        internal.editor.perform(Action::SelectAll);
+        internal
+            .editor
+            .perform(Action::Edit(Edit::Paste(Arc::new(new_text.to_string()))));
+        internal.is_dirty = true;
+    }
 }
 
 impl<Renderer> Clone for Content<Renderer>

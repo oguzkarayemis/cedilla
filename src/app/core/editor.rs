@@ -108,8 +108,9 @@ impl EditorState {
                 &self.history.history_patches[..self.history.history_index],
             );
 
-            self.content = text_editor::Content::with_text(&snapshot);
+            self.content.replace_text(&snapshot);
             preview.update_content(&snapshot);
+
             self.is_dirty =
                 self.history.history_index != 0 || !self.history.history_base.trim().is_empty();
 
@@ -132,7 +133,7 @@ impl EditorState {
                 &self.history.history_patches[..self.history.history_index],
             );
 
-            self.content = text_editor::Content::with_text(&snapshot);
+            self.content.replace_text(&snapshot);
             preview.update_content(&snapshot);
 
             self.restore_cursor(line, col);
